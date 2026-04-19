@@ -1,0 +1,32 @@
+{
+  "name": "crypto-lab-ibe-gate-",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/systemslibrarian/crypto-lab-ibe-gate-.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/systemslibrarian/crypto-lab-ibe-gate-/issues"
+  },
+  "homepage": "https://github.com/systemslibrarian/crypto-lab-ibe-gate-#readme",
+  "dependencies": {
+    "@noble/curves": "^2.2.0",
+    "@noble/hashes": "^2.2.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.8"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0"
+  }
+}

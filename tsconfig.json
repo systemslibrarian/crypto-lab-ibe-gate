@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "strict": true,
+    "noFallthroughCasesInSwitch": true,
+    "paths": {
+      "@noble/curves/bls12-381.js": ["./node_modules/@noble/curves/src/bls12-381.ts"],
+      "@noble/hashes/sha2.js": ["./node_modules/@noble/hashes/src/sha2.ts"]
+    },
+    "types": ["node"]
+  },
+  "include": ["src", "vite.config.ts"]
+}
