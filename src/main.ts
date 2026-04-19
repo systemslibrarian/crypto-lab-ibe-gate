@@ -57,7 +57,10 @@ function getVal(id: string): string {
 
 function disableBtn(id: string, disabled: boolean) {
   const el = document.getElementById(id) as HTMLButtonElement | null;
-  if (el) el.disabled = disabled;
+  if (el) {
+    el.disabled = disabled;
+    el.setAttribute('aria-disabled', String(disabled));
+  }
 }
 
 function loading(id: string): void {
@@ -83,13 +86,16 @@ document.addEventListener('DOMContentLoaded', () => {
 function renderApp() {
   const app = document.getElementById('app')!;
   app.innerHTML = `
-    <div class="lab-header">
-      <button class="theme-toggle" id="theme-toggle">Toggle Theme</button>
-      <h1>IBE Gate — Identity-Based Encryption</h1>
-      <div class="subtitle">Boneh-Franklin BasicIdent (2001) · BLS12-381 Pairings · IND-CPA</div>
-    </div>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <header class="lab-header">
+      <div class="lab-header-text">
+        <h1>IBE Gate — Identity-Based Encryption</h1>
+        <div class="subtitle">Boneh-Franklin BasicIdent (2001) · BLS12-381 Pairings · IND-CPA</div>
+      </div>
+      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle light/dark theme">Toggle Theme</button>
+    </header>
 
-    <div class="warning-box">
+    <div class="warning-box" role="note" aria-label="Security note">
       <div class="warning-title">⚠ IND-CPA ONLY — NOT IND-CCA</div>
       This demo implements BasicIdent from Boneh-Franklin 2001 §4.1.
       BasicIdent is semantically secure (IND-CPA) but NOT IND-CCA secure.
@@ -97,29 +103,40 @@ function renderApp() {
       Production systems use FullIdent (§4.2) with the Fujisaki-Okamoto transform.
     </div>
 
-    <nav class="tab-nav">
-      <button class="tab-btn active" data-tab="setup">1 · Setup Ceremony</button>
-      <button class="tab-btn" data-tab="encrypt">2 · Encrypt to Stranger</button>
-      <button class="tab-btn" data-tab="wrongkey">3 · Wrong Key = Garbage</button>
-      <button class="tab-btn" data-tab="timelimit">4 · Time-Limited</button>
-      <button class="tab-btn" data-tab="escrow">5 · PKG Escrow Tradeoff</button>
+    <nav aria-label="Exhibits" class="tab-nav" role="tablist">
+      <button class="tab-btn" role="tab" aria-selected="true"  aria-controls="panel-setup"     id="tab-setup"     data-tab="setup">1 · Setup Ceremony</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-encrypt"   id="tab-encrypt"   data-tab="encrypt">2 · Encrypt to Stranger</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-wrongkey"  id="tab-wrongkey"  data-tab="wrongkey">3 · Wrong Key = Garbage</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-timelimit" id="tab-timelimit" data-tab="timelimit">4 · Time-Limited</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-escrow"    id="tab-escrow"    data-tab="escrow">5 · PKG Escrow Tradeoff</button>
     </nav>
 
-    ${exhibit1()}
-    ${exhibit2()}
-    ${exhibit3()}
-    ${exhibit4()}
-    ${exhibit5()}
+    <main id="main-content">
+      ${exhibit1()}
+      ${exhibit2()}
+      ${exhibit3()}
+      ${exhibit4()}
+      ${exhibit5()}
+    </main>
   `;
 
-  // Tab switching
+  // Tab switching with ARIA
   document.querySelectorAll('.tab-btn').forEach((btn) => {
     btn.addEventListener('click', () => {
       const tab = (btn as HTMLElement).dataset.tab!;
-      document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
-      document.querySelectorAll('.panel').forEach((p) => p.classList.remove('active'));
+      document.querySelectorAll<HTMLButtonElement>('.tab-btn').forEach((b) => {
+        b.classList.remove('active');
+        b.setAttribute('aria-selected', 'false');
+      });
+      document.querySelectorAll<HTMLElement>('.panel').forEach((p) => {
+        p.classList.remove('active');
+        p.setAttribute('aria-hidden', 'true');
+      });
       btn.classList.add('active');
-      document.getElementById(`panel-${tab}`)!.classList.add('active');
+      (btn as HTMLButtonElement).setAttribute('aria-selected', 'true');
+      const panel = document.getElementById(`panel-${tab}`)!;
+      panel.classList.add('active');
+      panel.setAttribute('aria-hidden', 'false');
     });
   });
 
@@ -142,19 +159,19 @@ function renderApp() {
 
 function exhibit1(): string {
   return `
-  <div class="panel active" id="panel-setup">
+  <div class="panel active" id="panel-setup" role="tabpanel" aria-labelledby="tab-setup" aria-hidden="false">
     <div class="card">
       <h2>Exhibit 1 — The Setup Ceremony</h2>
-      <p style="color:var(--text-dim);margin-bottom:14px;font-size:12px;">
+      <p style="color:var(--text-dim);margin-bottom:14px;font-size:13px;">
         The Private Key Generator (PKG) runs setup once. This produces system-wide
         public parameters and keeps the master secret <em>s</em> private.
       </p>
       <button class="btn btn-primary" id="btn-setup">▶ Run Setup</button>
-      <div class="term" id="term-setup">Waiting to run setup…</div>
+      <div class="term" id="term-setup" aria-live="polite" aria-label="Setup ceremony output">Waiting to run setup…</div>
     </div>
     <div class="card" id="card-setup-math" style="display:none">
       <h2>Why This Works</h2>
-      <div class="term" style="font-size:11px">
+      <div class="term" style="font-size:11px" aria-label="Mathematics explanation">
 e(d_ID, U) = e(s·Q_ID, r·P)
            = e(Q_ID, P)^(s·r)
            = e(Q_ID, s·P)^r
@@ -225,33 +242,33 @@ Defining hash functions:
 
 function exhibit2(): string {
   return `
-  <div class="panel" id="panel-encrypt">
+  <div class="panel" id="panel-encrypt" role="tabpanel" aria-labelledby="tab-encrypt" aria-hidden="true">
     <div class="card">
       <h2>Exhibit 2 — Encrypt Before Recipient Exists</h2>
-      <p style="color:var(--text-dim);margin-bottom:14px;font-size:12px;">
+      <p style="color:var(--text-dim);margin-bottom:14px;font-size:13px;">
         Alice encrypts a message to Bob's email — before Bob has enrolled with the PKG.
         Bob can decrypt once the PKG issues his private key.
       </p>
       <div class="field-row">
-        <label>Recipient Identity (any string — email, role, phone…)</label>
-        <input id="enc-identity" value="bob@newcompany.com" />
+        <label for="enc-identity">Recipient Identity (any string — email, role, phone…)</label>
+        <input id="enc-identity" value="bob@newcompany.com" autocomplete="off" />
       </div>
       <div class="field-row">
-        <label>Message (max 32 bytes)</label>
-        <input id="enc-message" value="Q2 financials strictly confidential" />
+        <label for="enc-message">Message (max 32 bytes)</label>
+        <input id="enc-message" value="Q2 financials strictly confidential" autocomplete="off" />
       </div>
-      <button class="btn btn-primary" id="btn-encrypt" disabled>🔒 Encrypt</button>
-      <div class="term" id="term-encrypt">Run Setup first (Exhibit 1).</div>
+      <button class="btn btn-primary" id="btn-encrypt" disabled aria-disabled="true">🔒 Encrypt</button>
+      <div class="term" id="term-encrypt" aria-live="polite" aria-label="Encryption output">Run Setup first (Exhibit 1).</div>
     </div>
     <div class="card" id="card-enroll" style="display:none">
       <h2>Bob Enrolls with PKG</h2>
       <button class="btn btn-gold" id="btn-enroll">👤 Bob Enrolls — PKG Extracts Key</button>
-      <div class="term" id="term-enroll">Waiting…</div>
+      <div class="term" id="term-enroll" aria-live="polite" aria-label="Enrollment output">Waiting…</div>
     </div>
     <div class="card" id="card-decrypt2" style="display:none">
       <h2>Bob Decrypts</h2>
       <button class="btn btn-primary" id="btn-decrypt2">🔓 Decrypt</button>
-      <div class="term" id="term-decrypt2">Waiting…</div>
+      <div class="term" id="term-decrypt2" aria-live="polite" aria-label="Decryption output">Waiting…</div>
     </div>
   </div>`;
 }
@@ -359,34 +376,34 @@ Decrypted message:
 
 function exhibit3(): string {
   return `
-  <div class="panel" id="panel-wrongkey">
+  <div class="panel" id="panel-wrongkey" role="tabpanel" aria-labelledby="tab-wrongkey" aria-hidden="true">
     <div class="card">
       <h2>Exhibit 3 — Wrong Identity = Garbage</h2>
-      <p style="color:var(--text-dim);margin-bottom:14px;font-size:12px;">
+      <p style="color:var(--text-dim);margin-bottom:14px;font-size:13px;">
         Eve intercepts Alice's ciphertext. Eve has her OWN private key from the PKG.
         But encrypting to Alice means only Alice's key can decrypt it.
       </p>
       <div class="field-row">
-        <label>Alice's Identity</label>
-        <input id="wk-alice" value="alice@example.com" />
+        <label for="wk-alice">Alice's Identity</label>
+        <input id="wk-alice" value="alice@example.com" autocomplete="off" />
       </div>
       <div class="field-row">
-        <label>Eve's Identity (her own, different key)</label>
-        <input id="wk-eve" value="eve@example.com" />
+        <label for="wk-eve">Eve's Identity (her own, different key)</label>
+        <input id="wk-eve" value="eve@example.com" autocomplete="off" />
       </div>
       <div class="field-row">
-        <label>Message (encrypted to Alice)</label>
-        <input id="wk-message" value="Q2 financials strictly confidential" />
+        <label for="wk-message">Message (encrypted to Alice)</label>
+        <input id="wk-message" value="Q2 financials strictly confidential" autocomplete="off" />
       </div>
-      <button class="btn btn-primary" id="btn-wrongkey-run" disabled>▶ Run Demonstration</button>
+      <button class="btn btn-primary" id="btn-wrongkey-run" disabled aria-disabled="true">▶ Run Demonstration</button>
       <div class="cols-2" style="margin-top:14px">
         <div>
-          <div style="color:var(--green);font-size:11px;margin-bottom:6px;text-transform:uppercase;">Alice Decrypts (correct key)</div>
-          <div class="term" id="term-wk-alice">Waiting…</div>
+          <div style="color:var(--green);font-size:11px;margin-bottom:6px;text-transform:uppercase;" aria-hidden="true">Alice Decrypts (correct key)</div>
+          <div class="term" id="term-wk-alice" aria-live="polite" aria-label="Alice decryption output">Waiting…</div>
         </div>
         <div>
-          <div style="color:var(--red);font-size:11px;margin-bottom:6px;text-transform:uppercase;">Eve Decrypts (wrong key)</div>
-          <div class="term" id="term-wk-eve">Waiting…</div>
+          <div style="color:var(--red);font-size:11px;margin-bottom:6px;text-transform:uppercase;" aria-hidden="true">Eve Decrypts (wrong key)</div>
+          <div class="term" id="term-wk-eve" aria-live="polite" aria-label="Eve decryption output (wrong key)">Waiting…</div>
         </div>
       </div>
     </div>
@@ -402,23 +419,25 @@ function wireExhibit3() {
 
     loading('term-wk-alice');
     loading('term-wk-eve');
+    disableBtn('btn-wrongkey-run', true);
     await new Promise((r) => setTimeout(r, 50));
 
-    const padded = pad(msgStr, MSG_BYTES);
-    const ct = await encrypt(padded, aliceId, sys.params);
+    try {
+      const padded = pad(msgStr, MSG_BYTES);
+      const ct = await encrypt(padded, aliceId, sys.params);
 
-    const aliceKey = extract(aliceId, sys.masterKey);
-    const eveKey = extract(eveId, sys.masterKey);
+      const aliceKey = extract(aliceId, sys.masterKey);
+      const eveKey = extract(eveId, sys.masterKey);
 
-    const [aliceDecrypted, eveDecrypted] = await Promise.all([
-      decrypt(ct, aliceKey, sys.params),
-      decryptWrongKey(ct, eveKey, sys.params),
-    ]);
+      const [aliceDecrypted, eveDecrypted] = await Promise.all([
+        decrypt(ct, aliceKey, sys.params),
+        decryptWrongKey(ct, eveKey, sys.params),
+      ]);
 
-    const aliceMsg = unpad(aliceDecrypted);
-    const eveBytes = hex(eveDecrypted);
+      const aliceMsg = unpad(aliceDecrypted);
+      const eveBytes = hex(eveDecrypted);
 
-    setHTML('term-wk-alice', `
+      setHTML('term-wk-alice', `
 d_ID = s · H₁("${aliceId}")
 e(d_ID, U) ∈ G_T ← correct pairing
 
@@ -427,7 +446,7 @@ V ⊕ H₂(correct GT) =
 <span class="lbl-green">✓ "${aliceMsg}"</span>
     `.trim());
 
-    setHTML('term-wk-eve', `
+      setHTML('term-wk-eve', `
 d_ID = s · H₁("${eveId}")
 e(d_ID, U) ∈ G_T ← DIFFERENT pairing
 
@@ -436,6 +455,12 @@ V ⊕ H₂(wrong GT) =
 <span class="lbl-red">✗ ${eveBytes}</span>
 <span class="lbl-dim">  (random-looking garbage — not the message)</span>
     `.trim());
+    } catch (e) {
+      setHTML('term-wk-alice', `<span class="lbl-red">ERROR: ${e}</span>`);
+      setHTML('term-wk-eve', `<span class="lbl-red">ERROR: ${e}</span>`);
+    }
+
+    disableBtn('btn-wrongkey-run', false);
   });
 }
 
@@ -444,32 +469,32 @@ V ⊕ H₂(wrong GT) =
 function exhibit4(): string {
   const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
   return `
-  <div class="panel" id="panel-timelimit">
+  <div class="panel" id="panel-timelimit" role="tabpanel" aria-labelledby="tab-timelimit" aria-hidden="true">
     <div class="card">
       <h2>Exhibit 4 — Time-Limited Capabilities</h2>
-      <p style="color:var(--text-dim);margin-bottom:14px;font-size:12px;">
+      <p style="color:var(--text-dim);margin-bottom:14px;font-size:13px;">
         The identity string itself encodes policy. Encrypt to "email || date"
         and implement a PKG policy that only extracts keys for today's date.
         The result: messages that can only be decrypted on a specific day.
       </p>
       <div class="field-row">
-        <label>Recipient Email</label>
-        <input id="tl-email" value="bob@example.com" />
+        <label for="tl-email">Recipient Email</label>
+        <input id="tl-email" value="bob@example.com" autocomplete="off" />
       </div>
       <div class="field-row">
-        <label>Valid Date (YYYY-MM-DD) — this is baked into the identity string</label>
-        <input id="tl-date" value="${tomorrow}" />
+        <label for="tl-date">Valid Date (YYYY-MM-DD) — baked into the identity string</label>
+        <input id="tl-date" type="date" value="${tomorrow}" />
       </div>
       <div class="field-row">
-        <label>Message</label>
-        <input id="tl-message" value="Embargo: release Q3 results on this date only" />
+        <label for="tl-message">Message</label>
+        <input id="tl-message" value="Embargo: release Q3 results on this date only" autocomplete="off" />
       </div>
-      <button class="btn btn-primary" id="btn-timelimit-run" disabled>▶ Run Scenario</button>
-      <div class="term" id="term-timelimit">Run Setup first (Exhibit 1).</div>
+      <button class="btn btn-primary" id="btn-timelimit-run" disabled aria-disabled="true">▶ Run Scenario</button>
+      <div class="term" id="term-timelimit" aria-live="polite" aria-label="Time-limited scenario output">Run Setup first (Exhibit 1).</div>
     </div>
     <div class="card">
       <h2>Real-World Applications</h2>
-      <div class="term" style="font-size:11px">
+      <div class="term" style="font-size:11px" aria-label="Real-world application examples">
 Identity string as policy expression:
   "bob@example.com || 2026-05-15"    ← dated private key
   "alice@corp.com || project-x"      ← project-scoped access
@@ -529,8 +554,8 @@ No separate ACL, no certificate, no PKI — just identity strings.</span>
 
 function exhibit5(): string {
   return `
-  <div class="panel" id="panel-escrow">
-    <div class="escrow-box">
+  <div class="panel" id="panel-escrow" role="tabpanel" aria-labelledby="tab-escrow" aria-hidden="true">
+    <div class="escrow-box" role="alert" aria-label="Central trust warning">
       <div class="escrow-title">⚠ CENTRAL TRUST: The PKG holds master secret s</div>
       Because d_ID = s · H₁(ID), the PKG can compute ANY user's private key at any time.
       The PKG can decrypt every message sent in the system. This is architectural — not a bug.
@@ -538,15 +563,15 @@ function exhibit5(): string {
     <div class="card">
       <h2>Exhibit 5 — The PKG Escrow Tradeoff</h2>
       <div class="field-row">
-        <label>Target Identity (PKG will derive this person's key)</label>
-        <input id="escrow-identity" value="ceo@megacorp.com" />
+        <label for="escrow-identity">Target Identity (PKG will derive this person's key)</label>
+        <input id="escrow-identity" value="ceo@megacorp.com" autocomplete="off" />
       </div>
       <div class="field-row">
-        <label>Secret Message (encrypted to target)</label>
-        <input id="escrow-message" value="Board meeting: vote to oust the CFO Thursday" />
+        <label for="escrow-message">Secret Message (encrypted to target)</label>
+        <input id="escrow-message" value="Board meeting: vote to oust the CFO Thursday" autocomplete="off" />
       </div>
-      <button class="btn btn-danger" id="btn-escrow-run" disabled>🔑 PKG Decrypts Everything</button>
-      <div class="term" id="term-escrow">Run Setup first (Exhibit 1).</div>
+      <button class="btn btn-danger" id="btn-escrow-run" disabled aria-disabled="true">🔑 PKG Decrypts Everything</button>
+      <div class="term" id="term-escrow" aria-live="polite" aria-label="Escrow demonstration output">Run Setup first (Exhibit 1).</div>
     </div>
     <div class="card">
       <h2>The Tradeoff</h2>
