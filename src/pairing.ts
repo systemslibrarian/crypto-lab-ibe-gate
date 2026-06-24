@@ -90,6 +90,25 @@ export function gtToBytes(gt: GTElement): Uint8Array {
   return bls.fields.Fp12.toBytes(gt);
 }
 
+/** Raise a GT element to a scalar power (the g_ID^r step). */
+export function gtPow(gt: GTElement, exp: bigint): GTElement {
+  return bls.fields.Fp12.pow(gt, exp);
+}
+
+/**
+ * Byte-exact equality of two GT elements. Used to *prove* — not assert —
+ * that two independently-computed pairings land on the same group element.
+ */
+export function gtEquals(a: GTElement, b: GTElement): boolean {
+  const ab = gtToBytes(a);
+  const bb = gtToBytes(b);
+  if (ab.length !== bb.length) return false;
+  for (let i = 0; i < ab.length; i++) {
+    if (ab[i] !== bb[i]) return false;
+  }
+  return true;
+}
+
 /** XOR two byte arrays of equal length. */
 export function xorBytes(a: Uint8Array, b: Uint8Array): Uint8Array {
   if (a.length !== b.length) {

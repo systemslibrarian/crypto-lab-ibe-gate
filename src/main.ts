@@ -6,9 +6,12 @@ import {
   encrypt,
   decrypt,
   decryptWrongKey,
+  demonstrateBilinearity,
+  verifyPairingIdentity,
   type IBESystem,
   type IBECiphertext,
 } from './ibe.ts';
+import { hashToG1, gtToBytes } from './pairing.ts';
 import {
   simulateTimeLimitedMessage,
   demonstrateKeyEscrow,
@@ -32,6 +35,22 @@ function hexG1(pt: InstanceType<typeof bls.G1.Point>): string {
 function hexG2(pt: InstanceType<typeof bls.G2.Point>): string {
   const b = pt.toBytes(true);
   return hex(b, 12);
+}
+
+// A GT element is a 576-byte Fp12 value. Show a short fingerprint of its
+// canonical serialization so two elements can be compared by eye.
+function hexGT(gt: ReturnType<typeof bls.pairing>): string {
+  return hex(gtToBytes(gt), 16);
+}
+
+function bigToBytes(n: bigint): Uint8Array {
+  let h = n.toString(16);
+  if (h.length % 2) h = '0' + h;
+  const out = new Uint8Array(h.length / 2);
+  for (let i = 0; i < out.length; i++) {
+    out[i] = parseInt(h.slice(i * 2, i * 2 + 2), 16);
+  }
+  return out;
 }
 
 function pad(msg: string, n: number): Uint8Array {
@@ -169,6 +188,19 @@ function exhibit1(): string {
       <button class="btn btn-primary" id="btn-setup">▶ Run Setup</button>
       <div class="term" id="term-setup" aria-live="polite" aria-label="Setup ceremony output">Waiting to run setup…</div>
     </div>
+    <div class="card">
+      <h2>First, The One Magic Property</h2>
+      <p style="color:var(--text-dim);margin-bottom:14px;font-size:13px;">
+        Everything below rests on a single property of the BLS12-381 pairing
+        <em>e</em>: it is <strong>bilinear</strong>. Pulling a scalar out of either
+        input multiplies in the exponent of the output:
+        <code>e(a·P, b·Q) = e(P, Q)<sup>a·b</sup></code>. We don't ask you to take
+        that on faith — pick two random scalars and watch both sides land on the
+        <em>exact same</em> group element.
+      </p>
+      <button class="btn btn-primary" id="btn-bilinear">▶ Test Bilinearity (random a, b)</button>
+      <div class="term" id="term-bilinear" aria-live="polite" aria-label="Bilinearity test output">Waiting…</div>
+    </div>
     <div class="card" id="card-setup-math" style="display:none">
       <h2>Why This Works</h2>
       <div class="term" style="font-size:11px" aria-label="Mathematics explanation">
@@ -180,6 +212,9 @@ e(d_ID, U) = e(s·Q_ID, r·P)
 
 So H₂(e(d_ID, U)) = H₂(g_ID^r), which XORs back to M.
 
+Decryption is just the bilinearity test above with a = s (hidden inside d_ID)
+and b = r (the sender's random scalar). Same property, applied to a secret.
+
 Security: Computing g_ID^r from U=r·P and public parameters requires
 solving the Bilinear Diffie-Hellman Problem (BDH) in BLS12-381 — believed hard.
       </div>
@@ -188,6 +223,42 @@ solving the Bilinear Diffie-Hellman Problem (BDH) in BLS12-381 — believed hard
 }
 
 function wireExhibit1() {
+  document.getElementById('btn-bilinear')!.addEventListener('click', async () => {
+    loading('term-bilinear');
+    disableBtn('btn-bilinear', true);
+    await new Promise((r) => setTimeout(r, 50));
+
+    try {
+      const { a, b, left, right, equal } = demonstrateBilinearity();
+      setHTML('term-bilinear', `
+<span class="lbl-cyan">BILINEARITY TEST — e(a·P, b·Q) =? e(P, Q)^(a·b)</span>
+<span class="lbl-dim">──────────────────────────────────────────────</span>
+
+Random scalars (fresh each run):
+  a = <span class="lbl-amber">${hex(bigToBytes(a), 12)}</span>
+  b = <span class="lbl-amber">${hex(bigToBytes(b), 12)}</span>
+
+LEFT  — pair first, then the scalars ride along inside:
+  e(a·P, b·Q)      = <span class="lbl-magenta">${hexGT(left)}</span>
+
+RIGHT — pair the generators, then exponentiate by a·b:
+  e(P, Q)^(a·b)    = <span class="lbl-green">${hexGT(right)}</span>
+
+<span class="lbl-${equal ? 'green' : 'red'}">${
+        equal
+          ? '✓ IDENTICAL — all 576 bytes match. The scalars moved into the exponent.'
+          : '✗ MISMATCH — this should never happen.'
+      }</span>
+
+<span class="lbl-dim">This is the whole trick. IBE decryption is this same move with the
+master secret s and the sender's random r as the two scalars.</span>
+      `.trim());
+    } catch (e) {
+      setHTML('term-bilinear', `<span class="lbl-red">ERROR: ${e}</span>`);
+    }
+    disableBtn('btn-bilinear', false);
+  });
+
   document.getElementById('btn-setup')!.addEventListener('click', async () => {
     loading('term-setup');
     disableBtn('btn-setup', true);
@@ -243,6 +314,22 @@ Defining hash functions:
 function exhibit2(): string {
   return `
   <div class="panel" id="panel-encrypt" role="tabpanel" aria-labelledby="tab-encrypt" aria-hidden="true">
+    <div class="cols-2" style="margin-bottom:16px">
+      <div class="contrast-box contrast-bad">
+        <div class="contrast-title">✗ Classic PKI / RSA</div>
+        Alice wants to email <code class="pki-recipient">bob@newcompany.com</code>.
+        First she needs the recipient's <em>public-key certificate</em>.
+        They have never enrolled → no certificate exists anywhere →
+        no key server has them → <strong>Alice is blocked. She cannot encrypt.</strong>
+      </div>
+      <div class="contrast-box contrast-good">
+        <div class="contrast-title">✓ Identity-Based Encryption</div>
+        Alice types <code class="pki-recipient">bob@newcompany.com</code> and encrypts.
+        The <em>email address itself is the public key</em> —
+        no certificate, no lookup, no enrolment first.
+        <strong>The recipient can be issued a key years later and still decrypt.</strong>
+      </div>
+    </div>
     <div class="card">
       <h2>Exhibit 2 — Encrypt Before Recipient Exists</h2>
       <p style="color:var(--text-dim);margin-bottom:14px;font-size:13px;">
@@ -277,6 +364,20 @@ let _ct2: IBECiphertext | null = null;
 let _bobKey2: InstanceType<typeof bls.G1.Point> | null = null;
 
 function wireExhibit2() {
+  // Keep the PKI-vs-IBE contrast box honest: echo whatever recipient the user
+  // actually types. Falls back to the placeholder when the field is empty.
+  const encId = document.getElementById('enc-identity') as HTMLInputElement | null;
+  const syncContrast = () => {
+    const who = (encId?.value.trim() || 'bob@newcompany.com');
+    document.querySelectorAll('.pki-recipient').forEach((el) => {
+      el.textContent = who;
+    });
+  };
+  if (encId) {
+    syncContrast();
+    encId.addEventListener('input', syncContrast);
+  }
+
   document.getElementById('btn-encrypt')!.addEventListener('click', async () => {
     const sys = getSystem();
     const identity = getVal('enc-identity');
@@ -287,13 +388,15 @@ function wireExhibit2() {
     try {
       const padded = pad(msg, MSG_BYTES);
       _ct2 = await encrypt(padded, identity, sys.params);
+      const Q_ID = hashToG1(identity);
 
       setHTML('term-encrypt', `
 <span class="lbl-cyan">ALICE ENCRYPTS TO "${identity}"</span>
 <span class="lbl-dim">──────────────────────────────────────────</span>
 
-Compute Q_ID = H₁("${identity}") ∈ G1:
-  <span class="lbl-cyan">Q_ID = [hash-to-curve result] (via RFC 9380)</span>
+Compute Q_ID = H₁("${identity}") ∈ G1  (RFC 9380 hash-to-curve):
+  <span class="lbl-cyan">Q_ID = ${hexG1(Q_ID)}…</span>
+  <span class="lbl-dim">^ this point IS Bob's public key — derived from his email alone.</span>
 
 Pick random r ← [1, r-1]:
   r = <span class="censor">████████████████</span> (discarded after encryption)
@@ -351,6 +454,10 @@ Bob's private key:
     const decrypted = await decrypt(_ct2, _bobKey2, sys.params);
     const msg = unpad(decrypted);
 
+    // Prove correctness for THIS ciphertext: recompute the recipient-side
+    // pairing and compare it byte-for-byte to the sender's g_ID^r.
+    const proof = verifyPairingIdentity(_ct2, _bobKey2);
+
     setHTML('term-decrypt2', `
 <span class="lbl-gold">BOB DECRYPTS</span>
 <span class="lbl-dim">──────────────────────────────────────</span>
@@ -361,13 +468,16 @@ M = V ⊕ H₂(e(d_ID, U))
 Decrypted message:
 <span class="lbl-green">✓ "${msg}"</span>
 
-<span class="lbl-dim">The mathematics:
-  e(d_ID, U) = e(s·Q_ID, r·P)
-             = e(Q_ID, P_pub)^r
-             = g_ID^r
-
-  H₂(e(d_ID, U)) = H₂(g_ID^r)  ← same mask as encryption
-  V ⊕ that mask = M              ← original message recovered</span>
+<span class="lbl-cyan">PROOF — the two sides really are the same group element:</span>
+  Sender computed   e(Q_ID, P_pub)^r = <span class="lbl-magenta">${hexGT(proof.senderGt)}</span>
+  Bob computes      e(d_ID, U)       = <span class="lbl-green">${hexGT(proof.recipientGt)}</span>
+<span class="lbl-${proof.equal ? 'green' : 'red'}">  ${
+      proof.equal
+        ? '✓ Byte-identical (all 576 bytes). Same mask → V ⊕ mask = M.'
+        : '✗ Mismatch — should never happen.'
+    }</span>
+<span class="lbl-dim">  Bob never saw r. He reconstructed the sender's exact masking element
+  using only his private key d_ID and the public U. That is the magic.</span>
     `.trim());
   });
 }

@@ -1,15 +1,19 @@
 import { bls12_381 as bls } from '@noble/curves/bls12-381.js';
 import {
+  BLS12_381,
   randomScalar,
   pairing,
+  gtPow,
+  gtEquals,
   hashToG1,
   hashGTtoBytes,
   xorBytes,
   type G1Point,
   type G2Point,
+  type GTElement,
 } from './pairing.ts';
 
-export type { G1Point, G2Point };
+export type { G1Point, G2Point, GTElement };
 
 export interface IBESystemParams {
   P: G2Point;           // generator in G2
@@ -30,6 +34,14 @@ export interface IBECiphertext {
   U: G2Point;        // r · P
   V: Uint8Array;     // M ⊕ H₂(g_ID^r)
   identity: string;  // displayed for demo; not sent in real deployment
+  /**
+   * DEMO ONLY — NOT part of a real ciphertext and NEVER transmitted.
+   * The encryption-side group element g_ID^r = e(Q_ID, P_pub)^r. We retain it
+   * so the UI can prove, byte-for-byte, that the recipient's independently
+   * computed e(d_ID, U) lands on the exact same GT element. In a real
+   * deployment r is discarded the instant encryption finishes.
+   */
+  _demoGtMask: GTElement;
 }
 
 /**
@@ -50,6 +62,33 @@ export function setup(messageBytes: number = 32): IBESystem {
     params: { P, Ppub, messageBytes },
     masterKey: { s },
   };
+}
+
+/**
+ * DEMO: the bilinearity property that makes the whole scheme possible.
+ *
+ *   e(a·P, b·Q) = e(P, Q)^(a·b)
+ *
+ * IBE decryption is just this identity applied with a = s (master secret,
+ * folded into d_ID) and b = r (the sender's random scalar). We pick random
+ * a, b, compute each side independently, and compare byte-for-byte.
+ */
+export function demonstrateBilinearity(): {
+  a: bigint;
+  b: bigint;
+  left: GTElement;  // e(a·P, b·Q)
+  right: GTElement; // e(P, Q)^(a·b)
+  equal: boolean;
+} {
+  const P = BLS12_381.G1.Point.BASE as G1Point;
+  const Q = BLS12_381.G2.Point.BASE as G2Point;
+  const a = randomScalar();
+  const b = randomScalar();
+
+  const left = pairing(P.multiply(a) as G1Point, Q.multiply(b) as G2Point);
+  const right = gtPow(pairing(P, Q), (a * b) % BLS12_381.r);
+
+  return { a, b, left, right, equal: gtEquals(left, right) };
 }
 
 /**
@@ -98,13 +137,13 @@ export async function encrypt(
   const g_ID = pairing(Q_ID, params.Ppub);
 
   // g_ID^rnd in G_T
-  const g_ID_r = bls.fields.Fp12.pow(g_ID, rnd);
+  const g_ID_r = gtPow(g_ID, rnd);
 
   // V = M ⊕ H₂(g_ID^rnd)
   const mask = await hashGTtoBytes(g_ID_r, params.messageBytes);
   const V = xorBytes(message, mask);
 
-  return { U, V, identity };
+  return { U, V, identity, _demoGtMask: g_ID_r };
 }
 
 /**
@@ -121,6 +160,26 @@ export async function decrypt(
   const gt = pairing(privateKey, ciphertext.U);
   const mask = await hashGTtoBytes(gt, params.messageBytes);
   return xorBytes(ciphertext.V, mask);
+}
+
+/**
+ * DEMO: prove the Boneh-Franklin correctness identity holds for THIS ciphertext.
+ *
+ * The recipient computes  e(d_ID, U).
+ * The sender had computed  e(Q_ID, P_pub)^r  (retained as _demoGtMask).
+ * The theorem says these are the same GT element. We don't assert it — we
+ * recompute the recipient side and compare the two byte-for-byte.
+ *
+ *   e(d_ID, U) = e(s·Q_ID, r·P) = e(Q_ID, P)^(s·r) = e(Q_ID, s·P)^r
+ *              = e(Q_ID, P_pub)^r
+ */
+export function verifyPairingIdentity(
+  ciphertext: IBECiphertext,
+  privateKey: G1Point
+): { recipientGt: GTElement; senderGt: GTElement; equal: boolean } {
+  const recipientGt = pairing(privateKey, ciphertext.U); // e(d_ID, U)
+  const senderGt = ciphertext._demoGtMask;               // e(Q_ID, P_pub)^r
+  return { recipientGt, senderGt, equal: gtEquals(recipientGt, senderGt) };
 }
 
 /**

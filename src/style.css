@@ -324,6 +324,38 @@ body {
   .cols-2 { grid-template-columns: 1fr; }
 }
 
+/* PKI-vs-IBE contrast boxes */
+.contrast-box {
+  border: 1px solid var(--border);
+  padding: 14px 16px;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.contrast-box code {
+  background: var(--surface2);
+  padding: 1px 5px;
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  word-break: break-all;
+}
+.contrast-box .contrast-title {
+  font-size: 12px;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+.contrast-bad {
+  border-color: var(--red);
+  background: rgba(255, 51, 102, 0.05);
+}
+.contrast-bad .contrast-title { color: var(--red); }
+.contrast-good {
+  border-color: var(--green);
+  background: rgba(0, 255, 136, 0.05);
+}
+.contrast-good .contrast-title { color: var(--green); }
+
 /* Warning box */
 .warning-box {
   border: 1px solid var(--amber);
