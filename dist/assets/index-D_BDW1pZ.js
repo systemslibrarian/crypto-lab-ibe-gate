@@ -31,6 +31,11 @@
       ${kr()}
       ${jr()}
     </main>
+<footer style="margin-top:3rem;padding:2rem 1rem;border-top:1px solid rgba(128,128,128,.25);text-align:center;font-size:.85rem;line-height:1.9;font-family:ui-monospace,Menlo,Consolas,monospace">
+  <div><strong>Related demos:</strong> <a href="https://systemslibrarian.github.io/crypto-lab-pairing-gate/" style="color:var(--cyan)">pairing-gate</a> &middot; <a href="https://systemslibrarian.github.io/crypto-lab-iron-letter/" style="color:var(--cyan)">iron-letter</a> &middot; <a href="https://systemslibrarian.github.io/crypto-lab-pki-chain/" style="color:var(--cyan)">pki-chain</a> &middot; <a href="https://systemslibrarian.github.io/crypto-lab-envelope-kms/" style="color:var(--cyan)">envelope-kms</a></div>
+  <div style="margin-top:.5rem"><a href="https://github.com/systemslibrarian/crypto-lab-ibe-gate" style="color:var(--cyan)">Source on GitHub</a> &middot; <a href="https://crypto-lab.systemslibrarian.dev/" style="color:var(--cyan)">More crypto-lab demos</a></div>
+  <div style="margin-top:.75rem;color:var(--text-dim)">&ldquo;So whether you eat or drink or whatever you do, do it all for the glory of God.&rdquo; &mdash; 1 Corinthians 10:31</div>
+</footer>
   `,document.querySelectorAll(`.tab-btn`).forEach(e=>{e.addEventListener(`click`,()=>{let t=e.dataset.tab;document.querySelectorAll(`.tab-btn`).forEach(e=>{e.classList.remove(`active`),e.setAttribute(`aria-selected`,`false`)}),document.querySelectorAll(`.panel`).forEach(e=>{e.classList.remove(`active`),e.setAttribute(`aria-hidden`,`true`)}),e.classList.add(`active`),e.setAttribute(`aria-selected`,`true`);let n=document.getElementById(`panel-${t}`);n.classList.add(`active`),n.setAttribute(`aria-hidden`,`false`)})}),document.getElementById(`theme-toggle`).addEventListener(`click`,()=>{let e=document.documentElement.getAttribute(`data-theme`)===`dark`?`light`:`dark`;document.documentElement.setAttribute(`data-theme`,e),localStorage.setItem(`theme`,e)}),Cr(),Er(),Or(),Ar(),Mr()}function Sr(){return`
   <div class="panel active" id="panel-setup" role="tabpanel" aria-labelledby="tab-setup" aria-hidden="false">
     <div class="card">

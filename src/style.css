@@ -1,4 +1,5 @@
 :root {
+  color-scheme: dark;
   --bg: #0a0a0f;
   --surface: #13131a;
   --surface2: #1c1c28;
@@ -17,6 +18,7 @@
 }
 
 [data-theme='light'] {
+  color-scheme: light;
   --bg: #f4f4f8;
   --surface: #ffffff;
   --surface2: #ededf0;
@@ -34,7 +36,7 @@
 
 /* Light theme keeps terminal dark for contrast/readability */
 [data-theme='light'] .term {
-  background: #1a1a28;
+  background-color: #1a1a28;
   color: #e8e8f0;
 }
 [data-theme='light'] .term .lbl-cyan    { color: #00d4ff; }
@@ -56,7 +58,7 @@
   position: absolute;
   top: -100px;
   left: 0;
-  background: var(--cyan);
+  background-color: var(--cyan);
   color: #000;
   padding: 8px 16px;
   font-family: var(--font-mono);
@@ -67,9 +69,20 @@
 .skip-link:focus {
   top: 0;
 }
+/* Light theme --cyan (#006fa8) is dark: black text is only 3.8:1 on it,
+   so switch to white (5.5:1). */
+[data-theme='light'] .skip-link {
+  color: #fff;
+}
+
+/* Explicit html background: WebKit reports the body->canvas propagated
+   background as transparent, which breaks axe contrast checks. */
+html {
+  background-color: var(--bg);
+}
 
 body {
-  background: var(--bg);
+  background-color: var(--bg);
   color: var(--text);
   font-family: var(--font-mono);
   font-size: 14px;
@@ -109,7 +122,7 @@ body {
 }
 
 .theme-toggle {
-  background: var(--surface2);
+  background-color: var(--surface2);
   border: 1px solid var(--border);
   color: var(--text);
   padding: 10px 14px;
@@ -137,7 +150,7 @@ body {
 }
 
 .tab-btn {
-  background: var(--surface);
+  background-color: var(--surface);
   border: 1px solid var(--border);
   color: var(--text-dim);
   padding: 10px 14px;
@@ -158,7 +171,7 @@ body {
 .tab-btn[aria-selected='true'] {
   color: var(--cyan);
   border-color: var(--cyan);
-  background: var(--surface2);
+  background-color: var(--surface2);
 }
 
 .tab-btn:focus-visible {
@@ -184,7 +197,7 @@ body {
 
 /* Section cards */
 .card {
-  background: var(--surface);
+  background-color: var(--surface);
   border: 1px solid var(--border);
   padding: 20px;
   margin-bottom: 16px;
@@ -208,7 +221,7 @@ body {
 
 /* Terminal output box */
 .term {
-  background: #050508;
+  background-color: #050508;
   border: 1px solid var(--border);
   padding: 14px;
   font-family: var(--font-mono);
@@ -228,7 +241,7 @@ body {
 .term .lbl-green { color: var(--green); }
 .term .lbl-amber { color: var(--amber); }
 .term .lbl-dim { color: var(--text-dim); }
-.term .censor { background: var(--red); color: var(--red); }
+.term .censor { background-color: var(--red); color: var(--red); }
 
 /* Inputs */
 .field-row {
@@ -247,7 +260,7 @@ body {
 
 .field-row input,
 .field-row textarea {
-  background: var(--surface2);
+  background-color: var(--surface2);
   border: 1px solid var(--border);
   color: var(--text);
   padding: 10px 12px;
@@ -269,7 +282,7 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface2);
+  background-color: var(--surface2);
   border: 1px solid var(--border);
   color: var(--text);
   padding: 10px 18px;
@@ -332,7 +345,7 @@ body {
   line-height: 1.55;
 }
 .contrast-box code {
-  background: var(--surface2);
+  background-color: var(--surface2);
   padding: 1px 5px;
   border-radius: 2px;
   font-family: var(--font-mono);
@@ -347,19 +360,19 @@ body {
 }
 .contrast-bad {
   border-color: var(--red);
-  background: rgba(255, 51, 102, 0.05);
+  background-color: rgba(255, 51, 102, 0.05);
 }
 .contrast-bad .contrast-title { color: var(--red); }
 .contrast-good {
   border-color: var(--green);
-  background: rgba(0, 255, 136, 0.05);
+  background-color: rgba(0, 255, 136, 0.05);
 }
 .contrast-good .contrast-title { color: var(--green); }
 
 /* Warning box */
 .warning-box {
   border: 1px solid var(--amber);
-  background: rgba(255, 170, 0, 0.05);
+  background-color: rgba(255, 170, 0, 0.05);
   padding: 12px 16px;
   margin-bottom: 16px;
 }
@@ -374,7 +387,7 @@ body {
 /* Escrow warning */
 .escrow-box {
   border: 2px solid var(--red);
-  background: rgba(255, 51, 102, 0.05);
+  background-color: rgba(255, 51, 102, 0.05);
   padding: 16px;
   margin-bottom: 16px;
 }
