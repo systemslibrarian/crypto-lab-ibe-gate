@@ -106,11 +106,16 @@ function renderApp() {
   const app = document.getElementById('app')!;
   app.innerHTML = `
     <a href="#main-content" class="skip-link">Skip to main content</a>
-    <header class="lab-header">
-      <div class="lab-header-text">
-        <h1>IBE Gate — Identity-Based Encryption</h1>
-        <div class="subtitle">Boneh-Franklin BasicIdent (2001) · BLS12-381 Pairings · IND-CPA</div>
+    <header class="cl-hero">
+      <div class="cl-hero-main">
+        <h1 class="cl-hero-title">IBE Gate</h1>
+        <p class="cl-hero-sub">Boneh-Franklin BasicIdent · 2001 · BLS12-381 pairing</p>
+        <p class="cl-hero-desc">Encrypt a message to any email address — no certificate, no enrollment — then watch the PKG derive that identity's private key on demand.</p>
       </div>
+      <aside class="cl-hero-why" aria-label="Why it matters">
+        <span class="cl-hero-why-label">WHY IT MATTERS</span>
+        <p class="cl-hero-why-text">IBE strips away the certificate plumbing that makes public-key crypto hard to deploy. The catch: the key-generating server can derive anyone's private key, so it can read every message — the escrow tradeoff you must weigh.</p>
+      </aside>
       <button class="theme-toggle" id="theme-toggle" aria-label="Toggle light/dark theme">Toggle Theme</button>
     </header>
 
