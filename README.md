@@ -46,6 +46,23 @@ npm install
 npm run dev
 ```
 
+## Run the Tests
+
+```bash
+npm test        # 21 Vitest crypto unit tests (Boneh-Franklin over BLS12-381)
+npm run test:a11y   # axe-core WCAG A/AA gate (Playwright, both themes)
+```
+
+The unit suite (`test/ibe.test.ts`) runs against the real `@noble/curves`
+pairing — no mocks — and covers:
+
+- **Bilinearity** `e(a·P, b·Q) = e(P, Q)^(a·b)` (random and fixed scalars) and pairing non-degeneracy.
+- **The BasicIdent correctness identity** `e(d_ID, U) = e(Q_ID, P_pub)^r`, checked byte-for-byte over the raw Fp12 serialization.
+- **Encrypt → extract → decrypt round-trip** for empty, single-char, role, time-limited, and Unicode identities.
+- **Forgery rejection:** a wrong-identity key or a foreign PKG's master secret does NOT recover the plaintext.
+- **Key escrow:** a PKG-derived key decrypts any identity (the architectural tradeoff, asserted rather than asserted-away).
+- **Primitive correctness:** deterministic `H₁` hash-to-curve into the prime-order subgroup, deterministic length-correct `H₂` XOF, and semantic security via fresh randomness `r` per encryption.
+
 ## Related Demos
 
 - [crypto-lab-pairing-gate](https://systemslibrarian.github.io/crypto-lab-pairing-gate/) — BLS signatures on the same BLS12-381 pairing this scheme is built on.

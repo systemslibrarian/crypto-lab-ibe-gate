@@ -1,19 +1,27 @@
 {
   "name": "crypto-lab-ibe-gate",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Browser demo of Boneh-Franklin BasicIdent Identity-Based Encryption over real BLS12-381 pairings (@noble/curves).",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:a11y": "playwright test"
   },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/systemslibrarian/crypto-lab-ibe-gate.git"
   },
-  "keywords": [],
+  "keywords": [
+    "ibe",
+    "identity-based-encryption",
+    "boneh-franklin",
+    "bls12-381",
+    "pairing",
+    "cryptography"
+  ],
   "author": "",
   "license": "ISC",
   "type": "module",
@@ -23,13 +31,14 @@
   "homepage": "https://github.com/systemslibrarian/crypto-lab-ibe-gate#readme",
   "dependencies": {
     "@noble/curves": "^2.2.0",
-    "@noble/hashes": "^2.2.0",
-    "typescript": "^6.0.3",
-    "vite": "^8.0.8"
+    "@noble/hashes": "^2.2.0"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
     "@playwright/test": "^1.61.1",
-    "@types/node": "^25.6.0"
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.8",
+    "vitest": "^3.2.7"
   }
 }
