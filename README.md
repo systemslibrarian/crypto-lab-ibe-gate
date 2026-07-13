@@ -10,6 +10,15 @@ Demonstrates encryption to unenrolled recipients, time-limited capabilities via 
 policy, role-based encryption, and the fundamental key-escrow tradeoff where the Private Key
 Generator can decrypt any message in the system.
 
+The walkthrough is built to be *seen*, not just narrated: a persistent SVG protocol map lights
+the active arrow as each step runs (P_pub published, U sent, d_ID issued, both pairings converging
+on the shared G_T mask); the XOR masking step is shown as animated coloured byte-grids so you watch
+a message become ciphertext and back; a consistent public/secret colour-and-icon convention marks
+what anyone can compute (Q_ID, U, P_pub, green) versus what needs the master secret (d_ID, gold-lock;
+s, redacted); and the byte-for-byte pairing-equality claim is made inspectable — an expander scans
+all 576 bytes of both G_T elements and reports the exact mismatch count instead of a truncated
+fingerprint.
+
 ## When to Use It
 
 - Understanding how IBE eliminates certificate distribution in favor of identity-based addressing
@@ -23,7 +32,7 @@ Generator can decrypt any message in the system.
 
 **[systemslibrarian.github.io/crypto-lab-ibe-gate](https://systemslibrarian.github.io/crypto-lab-ibe-gate/)**
 
-Run the full Boneh-Franklin BasicIdent protocol in the browser: a Private Key Generator runs setup, extracts a private key for an identity string, and you encrypt a message to any identity and decrypt it — every step over real BLS12-381 pairings via `@noble/curves`. The demo shows encryption to unenrolled recipients, time-limited and role-based identities encoded directly in the identity string, and makes the key-escrow tradeoff concrete by letting the PKG's master secret derive any user's key.
+Run the full Boneh-Franklin BasicIdent protocol in the browser: a Private Key Generator runs setup, extracts a private key for an identity string, and you encrypt a message to any identity and decrypt it — every step over real BLS12-381 pairings via `@noble/curves`. The demo shows encryption to unenrolled recipients, time-limited and role-based identities encoded directly in the identity string, and makes the key-escrow tradeoff concrete by letting the PKG's master secret derive any user's key. The time-limited exhibit lets *you* play the PKG at an issuance gate — issue, refuse, or collude — to make explicit that a date baked into an identity is inert text; the time-lock is enforced by the PKG's issuance policy, not by the string, and a compromised PKG can hand out the off-date key anyway.
 
 ## What Can Go Wrong
 

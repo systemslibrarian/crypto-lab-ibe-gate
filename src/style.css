@@ -441,6 +441,230 @@ body {
   outline-offset: 2px;
 }
 
+/* Visually-hidden text for screen readers (icon-only chips need a spoken name). */
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
+}
+
+/* ─── Public / secret value convention ──────────────────────────────────────
+   The one idea IBE turns on: Q_ID is derivable by ANYONE from the identity
+   string, but d_ID = s·Q_ID needs the PKG's master secret. We give those two
+   states a fixed visual language (icon + text + colour, never colour alone)
+   and reuse it in every exhibit. */
+.vchip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: .35em;
+  padding: 1px 7px;
+  border: 1px solid;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: .92em;
+  white-space: nowrap;
+}
+.vchip .vchip-ic { font-style: normal; }
+.vchip.v-public { color: var(--green); border-color: var(--green); }
+.vchip.v-secret { color: var(--gold);  border-color: var(--gold); }
+/* redacted master secret — icon+text carry meaning, red bar is decoration */
+.vchip.v-master { color: var(--red);   border-color: var(--red); }
+
+/* The terminal stays dark even in light theme, so chips rendered INSIDE a
+   .term must use the bright (dark-theme) hues — the light-theme darkened
+   greens/golds/reds would fail contrast on the near-black terminal. Mirrors
+   the existing [data-theme='light'] .term .lbl-* overrides. */
+[data-theme='light'] .term .vchip.v-public { color: #00ff88; border-color: #00ff88; }
+[data-theme='light'] .term .vchip.v-secret { color: #ffd700; border-color: #ffd700; }
+[data-theme='light'] .term .vchip.v-master { color: #ff3366; border-color: #ff3366; }
+
+/* Legend shown once, above the exhibits. */
+.value-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  align-items: center;
+  border: 1px solid var(--border);
+  background-color: var(--surface);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.value-legend .vl-item { display: flex; align-items: center; gap: 8px; }
+.value-legend .vl-note { color: var(--text-dim); }
+
+/* ─── Protocol flow diagram ──────────────────────────────────────────────── */
+.flow-wrap {
+  border: 1px solid var(--border);
+  background-color: var(--surface);
+  padding: 14px 16px 10px;
+  margin-bottom: 16px;
+}
+.flow-wrap h2 {
+  font-size: 13px;
+  color: var(--cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+.flow-caption {
+  color: var(--text-dim);
+  font-size: 12px;
+  margin-bottom: 8px;
+  min-height: 2.6em;
+}
+.flow-caption strong { color: var(--text); }
+.flow-svg { width: 100%; height: auto; display: block; }
+/* Actor boxes */
+.flow-svg .actor-box { fill: var(--surface2); stroke: var(--border); stroke-width: 1.5; }
+.flow-svg .actor-label { fill: var(--text); font: 700 13px var(--font-mono); }
+.flow-svg .actor-role { fill: var(--text-dim); font: 11px var(--font-mono); }
+.flow-svg .gt-node { fill: color-mix(in oklab, var(--cyan) 12%, var(--surface2)); stroke: var(--cyan); stroke-width: 1.5; }
+.flow-svg .gt-node-label { fill: var(--cyan); font: 700 12px var(--font-mono); }
+/* Arrows: dim by default, lit when their step is active. */
+.flow-svg .arrow { stroke-width: 2; fill: none; opacity: .35; transition: opacity .2s, stroke-width .2s; }
+.flow-svg .arrow-head { opacity: .35; transition: opacity .2s; }
+.flow-svg .arrow-label { font: 11px var(--font-mono); opacity: .5; transition: opacity .2s; }
+.flow-svg .arrow.public { stroke: var(--green); }
+.flow-svg .arrow.public + .arrow-head, .flow-svg .arrow-head.public { fill: var(--green); }
+.flow-svg .arrow.secret { stroke: var(--gold); }
+.flow-svg .arrow-head.secret { fill: var(--gold); }
+.flow-svg .arrow-label.public { fill: var(--green); }
+.flow-svg .arrow-label.secret { fill: var(--gold); }
+/* Active highlight — driven by a data-step attr on the <svg>. */
+.flow-svg [data-arrow].lit { opacity: 1; stroke-width: 3.5; }
+.flow-svg .arrow-head.lit { opacity: 1; }
+.flow-svg .arrow-label.lit { opacity: 1; font-weight: 700; }
+.flow-svg .gt-node.lit { stroke-width: 3; }
+@media (prefers-reduced-motion: reduce) {
+  .flow-svg .arrow, .flow-svg .arrow-head, .flow-svg .arrow-label { transition: none; }
+}
+
+/* ─── Byte-grid (XOR masking visualiser) ─────────────────────────────────── */
+.xor-viz {
+  margin-top: 14px;
+  border: 1px solid var(--border);
+  background-color: #050508;
+  padding: 12px 14px;
+}
+[data-theme='light'] .xor-viz { background-color: #1a1a28; }
+.xor-row {
+  display: grid;
+  grid-template-columns: 7.5em 1fr;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.xor-row:last-child { margin-bottom: 0; }
+.xor-row-label {
+  font-size: 11px;
+  color: #e8e8f0;
+  line-height: 1.35;
+}
+.xor-row-label .xr-sub { color: #8888aa; font-size: 10px; display: block; }
+.byte-grid {
+  display: grid;
+  grid-template-columns: repeat(16, 1fr);
+  gap: 2px;
+}
+.byte-cell {
+  aspect-ratio: 1;
+  min-width: 0;
+  border-radius: 2px;
+  /* value carried by aria-label / title, not colour alone */
+}
+.byte-cell.plain { outline: 1px solid rgba(0, 212, 255, .35); outline-offset: -1px; }
+.op-symbol {
+  grid-column: 2;
+  color: #8888aa;
+  font-size: 12px;
+  text-align: left;
+  margin: -4px 0 0 2px;
+}
+.xor-legend { font-size: 10.5px; color: #8888aa; margin-top: 10px; line-height: 1.5; }
+.xor-legend .xl-swatch {
+  display: inline-block; width: 10px; height: 10px; border-radius: 2px;
+  vertical-align: middle; margin: 0 3px 0 8px; outline: 1px solid rgba(255,255,255,.25);
+}
+/* cell fade-in for the XOR animation */
+.byte-cell.mask-hidden { visibility: hidden; }
+@keyframes cellpop { from { transform: scale(.35); } to { transform: scale(1); } }
+.byte-cell.pop { animation: cellpop .18s ease-out; }
+@media (prefers-reduced-motion: reduce) { .byte-cell.pop { animation: none; } }
+
+/* ─── Full-576-byte inspector ────────────────────────────────────────────── */
+.gt-inspect { margin-top: 12px; }
+.gt-inspect > summary {
+  cursor: pointer;
+  color: var(--cyan);
+  font-size: 12px;
+  padding: 4px 0;
+  min-height: 32px;
+  line-height: 1.8;
+}
+.gt-inspect > summary:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.gt-inspect[open] > summary { margin-bottom: 8px; }
+.gt-diff-summary { font-size: 12px; margin-bottom: 8px; line-height: 1.6; }
+.gt-hex-dump {
+  background-color: #050508;
+  color: #e8e8f0;
+  border: 1px solid var(--border);
+  padding: 10px 12px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.55;
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+[data-theme='light'] .gt-hex-dump { background-color: #1a1a28; }
+.gt-hex-dump .gd-match { color: var(--green); }
+.gt-hex-dump .gd-diff  { color: var(--red); font-weight: 700; text-decoration: underline; }
+
+/* The inspector lives inside the always-dark .term, so in light theme its
+   summary and hex-dump text must use the bright hues, not the darkened
+   light-theme palette (which would fail contrast on near-black). */
+[data-theme='light'] .term .gt-inspect > summary { color: #00d4ff; }
+[data-theme='light'] .term .gt-hex-dump .gd-match { color: #00ff88; }
+[data-theme='light'] .term .gt-hex-dump .gd-diff  { color: #ff3366; }
+[data-theme='light'] .term .gt-diff-summary .lbl-green { color: #00ff88; }
+[data-theme='light'] .term .gt-diff-summary .lbl-red   { color: #ff3366; }
+
+/* ─── PKG issuance gate (Exhibit 4) ──────────────────────────────────────── */
+.pkg-gate {
+  border: 1px solid var(--gold);
+  background-color: rgba(255, 215, 0, .05);
+  padding: 12px 16px;
+  margin: 14px 0;
+}
+[data-theme='light'] .pkg-gate { background-color: rgba(138, 98, 0, .06); }
+.pkg-gate-title {
+  color: var(--gold);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  margin-bottom: 6px;
+}
+.pkg-gate p { font-size: 12px; color: var(--text-dim); margin-bottom: 10px; line-height: 1.5; }
+.pkg-gate .gate-choices { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.pkg-gate label.gate-opt {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 12px; color: var(--text); cursor: pointer;
+  text-transform: none; letter-spacing: 0;
+}
+.pkg-gate label.gate-opt input { margin-top: 2px; }
+.pkg-gate .gate-opt .go-note { color: var(--text-dim); display: block; font-size: 11px; }
+
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
   .spinner { animation: none; opacity: 0.6; }
