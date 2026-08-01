@@ -141,7 +141,7 @@ function xorViz(
   }
 ): string {
   return `
-  <div class="xor-viz" id="${opts.id}" aria-label="Byte-by-byte XOR: ${opts.topLabel} XOR mask equals ${opts.resultLabel}">
+  <div class="xor-viz" id="${opts.id}" role="group" aria-label="Byte-by-byte XOR: ${opts.topLabel} XOR mask equals ${opts.resultLabel}">
     <div class="xor-row">
       <div class="xor-row-label">${opts.topLabel}<span class="xr-sub">${opts.topSub}</span></div>
       ${byteGrid(top, { cls: 'plain', hidden: false })}
