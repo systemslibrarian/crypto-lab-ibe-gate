@@ -4,11 +4,20 @@
 
 Browser-based demo of Boneh-Franklin Identity-Based Encryption (IBE), implementing the 2001
 BasicIdent scheme from "Identity-Based Encryption from the Weil Pairing" (Boneh & Franklin).
-Uses BLS12-381 pairings via `@noble/curves` for the bilinear map e: G1 × G2 → GT. All IBE
-protocol steps — setup, extract, encrypt, decrypt — implemented from the original paper.
+Uses BLS12-381 pairings via `@noble/curves` for the bilinear map e: G1 × G2 → GT. All four IBE
+algorithms — setup, extract, encrypt, decrypt — follow the paper's BasicIdent definitions.
 Demonstrates encryption to unenrolled recipients, time-limited capabilities via identity string
 policy, role-based encryption, and the fundamental key-escrow tradeoff where the Private Key
 Generator can decrypt any message in the system.
+
+**One deliberate deviation from the paper.** Boneh-Franklin define BasicIdent over a *symmetric*
+admissible bilinear map `ê: G1 × G1 → G2` — Q_ID, P, P_pub and the ciphertext component rP all
+live in the same group, and the security reduction is to BDH in ⟨G1, G2, ê⟩. BLS12-381 has no
+such map; its pairing is **Type 3 asymmetric** with no efficient homomorphism between G1 and G2.
+So this demo splits the scheme the standard way — `Q_ID, d_ID ∈ G1` and `P, P_pub, U ∈ G2` — which
+keeps the correctness identity `e(d_ID, U) = e(Q_ID, P_pub)^r` exactly as written but moves the
+hardness assumption to the asymmetric (co-)BDH variant rather than the paper's symmetric BDH. The
+algebra on screen is the paper's; the group assignment is not.
 
 The walkthrough is built to be *seen*, not just narrated: a persistent SVG protocol map lights
 the active arrow as each step runs (P_pub published, U sent, d_ID issued, both pairings converging
@@ -40,11 +49,11 @@ Run the full Boneh-Franklin BasicIdent protocol in the browser: a Private Key Ge
 - BasicIdent is IND-CPA but not IND-CCA. An active attacker can modify ciphertexts. Production systems use FullIdent (Boneh-Franklin 2001 Section 4.2) with a Fujisaki-Okamoto transform for IND-CCA security.
 - Private keys must be transmitted securely from PKG to user. This requires out-of-band authentication — the PKG has to know the user is who they claim to be before issuing `d_ID`.
 - Revocation is hard. Unlike PKI where certificates can be revoked, an issued IBE private key is valid forever for that identity. Workarounds use short-lived identities (email || timestamp) or include revocation lists.
-- BLS12-381 pairings are computationally expensive. Pure TypeScript pairing takes ~100ms in a browser. Production deployments use C/Rust/assembly with optimized pairing libraries.
+- BLS12-381 pairings are computationally expensive. Measured here (Node 24, `@noble/curves` 2.2, Apple silicon): a warm single pairing is around 15 ms, and a cold first call — JIT warm-up included — is closer to 70 ms; a browser is in the same order of magnitude, not the same number. Every exhibit therefore runs one to two pairings per click, which is why they feel instant but not free. Production deployments use C/Rust/assembly with optimized pairing libraries.
 
 ## Real-World Usage
 
-Introduced by Adi Shamir in 1984 as a concept; first practical construction by Dan Boneh and Matthew Franklin at CRYPTO 2001. Full version published in SIAM Journal on Computing (2003). Real-world deployments include Voltage Security (now Micro Focus SecureMail, enterprise email encryption), TrendMicro PrivateKey (secure document sharing), IEEE 1363.3 standardization, and research deployments in healthcare and government systems. Hierarchical IBE (HIBE) extends the scheme to multi-level PKG structures; threshold IBE distributes the master secret. The underlying bilinear pairing is BLS12-381, the same curve used in Ethereum 2.0, Filecoin, Chia, and Zcash for BLS aggregated signatures.
+Introduced by Adi Shamir in 1984 as a concept; first practical construction by Dan Boneh and Matthew Franklin at CRYPTO 2001. Full version published in SIAM Journal on Computing (2003). The best-known commercial deployment is Voltage SecureMail, the IBE-based enterprise email product from Voltage Security — a company founded on the Boneh-Franklin work and since passed through HP, HPE Software, Micro Focus and (since the Micro Focus acquisition closed in 2023) OpenText, where it still ships as Voltage SecureMail. IBE was also standardized as IEEE Std 1363.3-2013 (Identity-Based Cryptographic Techniques using Pairings) and in IETF RFC 5091. Hierarchical IBE (HIBE) extends the scheme to multi-level PKG structures; threshold IBE distributes the master secret. The underlying bilinear pairing here is BLS12-381, the same curve used in Ethereum's consensus layer, Filecoin, Chia, and Zcash Sapling for BLS aggregated signatures — note that BLS12-381 postdates the paper by 16 years and is not a curve Boneh-Franklin proposed.
 
 ## How to Run Locally
 

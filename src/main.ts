@@ -61,6 +61,25 @@ function unpad(bytes: Uint8Array): string {
   return new TextDecoder().decode(bytes).replace(/\0+$/, '');
 }
 
+/**
+ * What `pad` will ACTUALLY encrypt for a given input string. BasicIdent here
+ * has a fixed 32-byte message space, so anything longer is silently cut — and
+ * a success test written as `unpad(plaintext) === whatTheUserTyped` then reads
+ * as a decryption FAILURE on every over-long input, including several of this
+ * page's own defaults. Verdicts compare against this instead.
+ */
+function fitted(msg: string, n: number): string {
+  return unpad(pad(msg, n));
+}
+
+/** Visible note when the message space truncated the user's input. */
+function truncNote(msg: string, n: number): string {
+  const kept = fitted(msg, n);
+  if (kept === msg) return '';
+  return `\n<span class="lbl-amber">  Note: BasicIdent's message space here is exactly ${n} bytes, so only
+  "${kept}" was encrypted — the rest of your input was cut before encryption.</span>`;
+}
+
 function setHTML(id: string, html: string) {
   const el = document.getElementById(id);
   if (el) el.innerHTML = html;
@@ -519,7 +538,14 @@ Decryption is just the bilinearity test above with a = s (hidden inside d_ID)
 and b = r (the sender's random scalar). Same property, applied to a secret.
 
 Security: Computing g_ID^r from U=r·P and public parameters requires
-solving the Bilinear Diffie-Hellman Problem (BDH) in BLS12-381 — believed hard.
+solving a Bilinear Diffie-Hellman problem in BLS12-381 — believed hard.
+
+One honest footnote on the groups: Boneh-Franklin write BasicIdent over a
+SYMMETRIC map ê: G1×G1→G2, with Q_ID, P, P_pub and rP all in one group, and
+reduce security to BDH there. BLS12-381's pairing is Type 3 ASYMMETRIC — no
+efficient map between G1 and G2 — so this demo puts Q_ID, d_ID in G1 and
+P, P_pub, U in G2. The identity above is unchanged, but the assumption it
+rests on is the asymmetric (co-)BDH variant, not the paper's symmetric BDH.
       </div>
     </div>
   </div>`;
@@ -713,7 +739,7 @@ Pick random r ← [1, r-1]:
 U = r · P ∈ G2  (96 bytes) — travels to Bob as part of the ciphertext:
   ${chip('public', `U = ${hexG2(_ct2.U)}…`)}
 
-g_ID = e(Q_ID, P_pub) ∈ G_T,  then mask = H₂(g_ID^r),  V = M ⊕ mask
+g_ID = e(Q_ID, P_pub) ∈ G_T,  then mask = H₂(g_ID^r),  V = M ⊕ mask${truncNote(msg, MSG_BYTES)}
       `.trim() +
         '\n' +
         xorViz(padded, mask, _ct2.V, {
@@ -910,7 +936,9 @@ e(d_ID, U) ∈ G_T — the correct pairing → correct mask
           id: 'xor-wk-alice',
           revealMask: true,
         }) +
-        `\n<span class="lbl-green">✓ "${aliceMsg}"</span>`);
+        `\n<span class="lbl-${aliceMsg === fitted(msgStr, MSG_BYTES) ? 'green' : 'red'}">${
+          aliceMsg === fitted(msgStr, MSG_BYTES) ? '✓' : '✗'
+        } "${aliceMsg}"</span>${truncNote(msgStr, MSG_BYTES)}`);
 
       setHTML('term-wk-eve', `
 ${chip('secret', `d_Eve = s·H₁("${eveId}")`)}  ← Eve's own valid key, wrong identity
@@ -1041,17 +1069,34 @@ function wireExhibit4() {
       let body: string;
 
       if (gate === 'refuse') {
-        // Off-date policy: the PKG simply declines to run Extract. No key exists.
+        // Off-date policy: the PKG declines to run Extract for the DATED
+        // identity. Bob is not keyless, though — he already holds the key for
+        // his plain address, which the PKG issues freely. So instead of
+        // asserting "stays locked", run the only decryption actually available
+        // to him and show what it produces.
+        const undatedId = email;
+        const undatedKey = extract(undatedId, sys.masterKey);
+        const attempt = await decrypt(ct, undatedKey, sys.params);
+        const recovered = unpad(attempt) === msgStr;
         header = `<span class="lbl-gold">PKG POLICY: REFUSE OFF-DATE KEY</span>`;
         body = `
 Bob requests d_ID for "${identity}" — but the PKG's clock says it's not
 the valid date yet, so it declines to extract:
   ${chip('secret', 'd_ID = s · H₁("…") — NOT ISSUED')}
 
-Bob has a ciphertext and no key. He can try to brute-force the pairing
-mask, but that is the Bilinear Diffie-Hellman problem — believed hard.
+Bob is not keyless: the PKG issues keys for his plain address on demand, so
+he holds d = s·H₁("${undatedId}"). We actually run that key against this
+ciphertext rather than assert the outcome:
 
-<span class="lbl-green">✓ Message stays locked.</span>
+  M′ = V ⊕ H₂(e(d, U)) = <span class="lbl-red">${hex(attempt)}</span>
+
+<span class="lbl-${recovered ? 'red' : 'green'}">${
+          recovered
+            ? '✗ It decrypted — that must never happen; treat it as a bug in this demo.'
+            : '✓ Garbage. e(d, U) is a different G_T element, so the mask is wrong.'
+        }</span>
+<span class="lbl-dim">  His only other option is to recover g_ID^r from U = r·P and the public
+  parameters — a Bilinear Diffie-Hellman problem, believed hard.</span>
 <span class="lbl-amber">  Note WHAT enforced this: the PKG's refusal, not the string.
   The date inside the identity is inert text — it cannot decline anything.
   Only a policy that governs issuance can.</span>`;
@@ -1060,7 +1105,8 @@ mask, but that is the Bilinear Diffie-Hellman problem — believed hard.
         // purely whether policy SHOULD have allowed it. The math is identical.
         const key = extract(identity, sys.masterKey);
         const out = await decrypt(ct, key, sys.params);
-        const ok = unpad(out) === msgStr;
+        const recoveredStr = unpad(out);
+        const ok = recoveredStr === fitted(msgStr, MSG_BYTES);
 
         if (gate === 'issue') {
           header = `<span class="lbl-green">PKG POLICY: ISSUE (on-date, authorised)</span>`;
@@ -1069,7 +1115,7 @@ It is the valid date. The PKG authenticates Bob and issues:
   ${chip('secret', `d_ID = s · H₁("${identity}")`)}
 
 Bob decrypts:
-  <span class="${ok ? 'lbl-green' : 'lbl-red'}">${ok ? `✓ "${msgStr}"` : '✗ Decryption failed'}</span>
+  <span class="${ok ? 'lbl-green' : 'lbl-red'}">${ok ? `✓ "${recoveredStr}"` : `✗ Decryption failed — recovered "${recoveredStr}"`}</span>${truncNote(msgStr, MSG_BYTES)}
 
 <span class="lbl-dim">Access happened because the PKG CHOSE to issue — exactly on schedule.</span>`;
         } else {
@@ -1081,7 +1127,7 @@ the same text either way:
   ${chip('secret', `d_ID = s · H₁("${identity}")`)}
 
 Bob (or an attacker with PKG help) decrypts BEFORE the embargo:
-  <span class="${ok ? 'lbl-red' : 'lbl-green'}">${ok ? `⚠ "${msgStr}" — released early` : '✗ Decryption failed'}</span>
+  <span class="${ok ? 'lbl-red' : 'lbl-green'}">${ok ? `⚠ "${recoveredStr}" — released early` : `✗ Decryption failed — recovered "${recoveredStr}"`}</span>${truncNote(msgStr, MSG_BYTES)}
 
 <span class="lbl-amber">  The "time-lock" was only ever a promise by the key issuer.
   Same escrow power from Exhibit 5, pointed at the clock.</span>`;
@@ -1217,8 +1263,15 @@ PKG computes:
 PKG applies d_ID to decrypt:
   M = V ⊕ H₂(e(d_ID, U))
 
-Result:
-<span class="lbl-${result.pkgCanDecrypt ? 'red' : 'green'}">${result.pkgCanDecrypt ? '⚠ PKG successfully decrypted: "' + msgStr + '"' : '✓ PKG could not decrypt (unexpected)'}</span>
+Result — this is what the PKG's derived key actually returned, not an echo
+of what you typed:
+<span class="lbl-${result.pkgCanDecrypt ? 'red' : 'green'}">${
+      result.pkgCanDecrypt
+        ? '⚠ PKG successfully decrypted: "' + result.decryptedMessage + '"'
+        : '✓ PKG could not decrypt (unexpected — this should never happen): "' +
+          result.decryptedMessage +
+          '"'
+    }</span>${truncNote(msgStr, MSG_BYTES)}
 
 <span class="lbl-amber">${result.explanation}</span>
 

@@ -9,6 +9,25 @@ import {
 } from './ibe.ts';
 
 /**
+ * BasicIdent's message space here is a fixed `messageBytes` block, so every
+ * caller pads-and-truncates before encrypting. A success flag must therefore be
+ * tested against the block that was ACTUALLY encrypted, not against the caller's
+ * original string: comparing to the original reports "decryption failed" for
+ * every input longer than the block, which is a false negative about working
+ * math rather than a real failure.
+ */
+function toBlock(message: string, n: number): Uint8Array {
+  const out = new Uint8Array(n);
+  out.set(new TextEncoder().encode(message).slice(0, n));
+  return out;
+}
+
+/** The exact string a `toBlock` round-trip yields — what success must equal. */
+function blockText(message: string, n: number): string {
+  return new TextDecoder().decode(toBlock(message, n)).replace(/\0+$/, '');
+}
+
+/**
  * SCENARIO 1: Encrypted email to an identity that hasn't been
  * enrolled yet.
  *
@@ -30,8 +49,8 @@ export async function simulateEncryptedEmail(
   message: string,
   system: IBESystem
 ): Promise<EmailScenario> {
-  const msgBytes = new TextEncoder().encode(message.padEnd(system.params.messageBytes, '\0'));
-  const padded = msgBytes.slice(0, system.params.messageBytes);
+  const padded = toBlock(message, system.params.messageBytes);
+  const expected = blockText(message, system.params.messageBytes);
 
   const ciphertext = await encrypt(padded, recipient, system.params);
 
@@ -46,7 +65,7 @@ export async function simulateEncryptedEmail(
     recipient,
     message,
     ciphertext,
-    decryptedSuccessfully: decryptedMessage === message,
+    decryptedSuccessfully: decryptedMessage === expected,
     decryptedMessage,
   };
 }
@@ -71,8 +90,8 @@ export async function simulateTimeLimitedMessage(
   const identity = `${recipient} || ${validDate}`;
   const wrongIdentity = `${recipient} || 9999-01-01`;
 
-  const msgBytes = new TextEncoder().encode(message.padEnd(system.params.messageBytes, '\0'));
-  const padded = msgBytes.slice(0, system.params.messageBytes);
+  const padded = toBlock(message, system.params.messageBytes);
+  const expected = blockText(message, system.params.messageBytes);
 
   const ciphertext = await encrypt(padded, identity, system.params);
 
@@ -89,8 +108,8 @@ export async function simulateTimeLimitedMessage(
   return {
     identity,
     ciphertext,
-    decryptedSuccessfully: decryptedStr === message,
-    wrongDateFails: wrongStr !== message,
+    decryptedSuccessfully: decryptedStr === expected,
+    wrongDateFails: wrongStr !== expected,
   };
 }
 
@@ -109,8 +128,8 @@ export async function simulateRoleDelegation(
   ciphertext: IBECiphertext;
   currentHolderDecrypts: boolean;
 }> {
-  const msgBytes = new TextEncoder().encode(message.padEnd(system.params.messageBytes, '\0'));
-  const padded = msgBytes.slice(0, system.params.messageBytes);
+  const padded = toBlock(message, system.params.messageBytes);
+  const expected = blockText(message, system.params.messageBytes);
 
   const ciphertext = await encrypt(padded, role, system.params);
 
@@ -122,7 +141,7 @@ export async function simulateRoleDelegation(
   return {
     identity: role,
     ciphertext,
-    currentHolderDecrypts: decryptedStr === message,
+    currentHolderDecrypts: decryptedStr === expected,
   };
 }
 
@@ -138,10 +157,12 @@ export async function demonstrateKeyEscrow(
   system: IBESystem
 ): Promise<{
   pkgCanDecrypt: boolean;
+  /** What the PKG's key actually produced — not the input string. */
+  decryptedMessage: string;
   explanation: string;
 }> {
-  const msgBytes = new TextEncoder().encode(message.padEnd(system.params.messageBytes, '\0'));
-  const padded = msgBytes.slice(0, system.params.messageBytes);
+  const padded = toBlock(message, system.params.messageBytes);
+  const expected = blockText(message, system.params.messageBytes);
 
   const ciphertext = await encrypt(padded, targetIdentity, system.params);
 
@@ -151,7 +172,8 @@ export async function demonstrateKeyEscrow(
   const decryptedStr = new TextDecoder().decode(decrypted).replace(/\0+$/, '');
 
   return {
-    pkgCanDecrypt: decryptedStr === message,
+    pkgCanDecrypt: decryptedStr === expected,
+    decryptedMessage: decryptedStr,
     explanation:
       `The PKG computed d_ID = s · H₁("${targetIdentity}") — the same key ` +
       `the user would receive. Because s is the master secret, the PKG can ` +
