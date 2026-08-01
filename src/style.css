@@ -4,6 +4,20 @@
   --surface: #13131a;
   --surface2: #1c1c28;
   --border: #2a2a3a;
+  /* Control boundaries only (WCAG 2.1 SC 1.4.11). `.field-row input` /
+     `.field-row textarea` are filled with --surface2 (#1c1c28) inside a --surface
+     (#13131a) card — 1.15:1 — so the border is the only thing delineating the
+     field. --border is 1.40:1 on --bg, 1.20:1 on --surface2. #6a6a75 is derived
+     from it along the same slate hue: 3.69:1 on --bg, 3.46:1 on --surface,
+     3.15:1 on --surface2.
+
+     Do NOT reuse this for --border, and do NOT fold --border into it. .term,
+     .xor-viz and .gt-hex-dump keep a near-black background in BOTH themes
+     (#050508, raised to #1a1a28 by the [data-theme='light'] overrides below),
+     so in the light theme the light --border (#aaaacc) is deliberately correct
+     there — 7.63:1 on #1a1a28. Darkening --border to fix the inputs would break
+     those panels instead. */
+  --border-strong: #6a6a75;
   --text: #e8e8f0;
   --text-dim: #8888aa;
   --cyan: #00d4ff;
@@ -23,6 +37,11 @@
   --surface: #ffffff;
   --surface2: #ededf0;
   --border: #aaaacc;
+  /* See the note in :root. --border stays #aaaacc because the always-dark
+     panels rely on it; only the control token darkens. #83839d keeps the
+     lab's lavender cast: 3.36:1 on --bg, 3.69:1 on --surface, 3.16:1 on
+     --surface2 (the input fill). */
+  --border-strong: #83839d;
   --text: #1a1a2e;
   --text-dim: #4a4a66;
   --cyan: #006fa8;
@@ -247,7 +266,9 @@ body {
 .field-row input,
 .field-row textarea {
   background-color: var(--surface2);
-  border: 1px solid var(--border);
+  /* Load-bearing control boundary (WCAG 2.1 SC 1.4.11) — --border-strong, not
+     --border. These always sit in a .card, never inside the always-dark .term. */
+  border: 1px solid var(--border-strong);
   color: var(--text);
   padding: 10px 12px;
   font-family: var(--font-mono);
