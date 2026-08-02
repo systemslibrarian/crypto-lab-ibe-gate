@@ -68,8 +68,25 @@ npm run dev
 
 ```bash
 npm test        # 21 Vitest crypto unit tests (Boneh-Franklin over BLS12-381)
-npm run test:a11y   # axe-core WCAG A/AA gate (Playwright, both themes)
+npm run build       # tsc + production bundle (the browser gate runs against this)
+npm run test:a11y   # Playwright: functional gate + axe-core WCAG A/AA, both themes
 ```
+
+`npm run test:a11y` runs the whole `e2e/` directory, which is two gates:
+
+- **`e2e/functional.spec.ts`** — drives the built page in Chromium and asserts
+  the states the page claims, so the exhibits are tested rather than merely
+  visited. Wherever a verdict has a computation on screen, the verdict is
+  checked against *that run's* numbers instead of a hardcoded string: the
+  "✓ IDENTICAL — all 576 bytes match" banner is only accepted if the two printed
+  G_T fingerprints really are equal; every XOR byte-grid is re-XORed from its own
+  rendered cells and compared to the row below it; the decrypt proof's sender and
+  recipient fingerprints are compared to each other; and the inspector's
+  "0 mismatches" counter is checked against the actual number of diff-coloured
+  cells in the 576-byte dump the same run produced. All three failure paths are
+  covered — Eve's wrong-identity key, the PKG's REFUSE policy, and the colluding
+  PKG — each asserted to reach its failure state *and* to say why.
+- **`e2e/a11y.spec.ts`** — axe-core WCAG 2.1 A/AA over every exhibit, both themes.
 
 The unit suite (`test/ibe.test.ts`) runs against the real `@noble/curves`
 pairing — no mocks — and covers:
