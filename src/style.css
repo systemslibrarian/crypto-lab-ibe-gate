@@ -26,6 +26,15 @@
   --magenta: #ff00aa;
   --green: #00ff88;
   --amber: #ffaa00;
+  /* Ink for text drawn INSIDE the protocol diagram's shapes. The diagram's
+     boxes are filled (--surface2, and a cyan-tinted G_T node), so text on them
+     is not on --bg and does not get to reuse --bg's tokens: --text-dim is
+     3.97:1 on the G_T fill, and --cyan is 4.01:1 on it in the light theme.
+     These two are the same hues carried far enough to clear 4.5:1 on the
+     lightest fill the diagram paints. In the dark theme --cyan-deep is --cyan
+     unchanged — bright cyan on a near-black tint was never the problem. */
+  --svg-dim: #a0a0c0;
+  --cyan-deep: #00d4ff;
   --font-mono: 'Fira Mono', 'Cascadia Code', 'Consolas', monospace;
   --focus-ring: 2px solid #00d4ff;
   --focus-offset: 2px;
@@ -50,6 +59,11 @@
   --magenta: #9b006e;
   --green: #006e3a;
   --amber: #905800;
+  /* See :root. --text-dim already clears 4.5:1 on both diagram fills here, so
+     --svg-dim matches it; --cyan does not, so --cyan-deep carries the same
+     hue down to 5.50:1 on the tinted G_T node. */
+  --svg-dim: #4a4a66;
+  --cyan-deep: #005a86;
   --focus-ring: 2px solid #006fa8;
 }
 
@@ -65,6 +79,12 @@
 [data-theme='light'] .term .lbl-green   { color: #00ff88; }
 [data-theme='light'] .term .lbl-amber   { color: #ffaa00; }
 [data-theme='light'] .term .lbl-dim     { color: #8888aa; }
+/* The spinner lives inside the terminal too, and it was the one dim thing in
+   there that never got this override: --text-dim resolves to #4a4a66 in the
+   light theme, which is 2.01:1 on the terminal's #1a1a28. So "⧗ Running…" —
+   the only feedback during a pairing computation — was the least readable text
+   on the page for exactly as long as the user was waiting on it. */
+[data-theme='light'] .term .spinner     { color: #8888aa; }
 
 * {
   box-sizing: border-box;
@@ -119,7 +139,12 @@ body {
 .cl-hero{display:flex;align-items:flex-start;justify-content:space-between;gap:clamp(1rem,4vw,3rem);flex-wrap:wrap;margin:clamp(1rem,3vw,2rem) 0 1.5rem;}
 .cl-hero-main{flex:1 1 22rem;min-width:min(100%,20rem);}
 .cl-hero-title{margin:0;font-size:clamp(1.6rem,3.8vw,2.7rem);font-weight:700;line-height:1.1;letter-spacing:.01em;color:var(--text);}
-.cl-hero-sub{margin:.4rem 0 0;font-size:clamp(.9rem,1.6vw,1.05rem);letter-spacing:.01em;color:var(--text-dim);opacity:.85;}
+/* No `opacity` here. The colour is already the muted token, and fading it a
+   second time dropped the painted result to rgb(117,117,147) on --bg —
+   4.45:1, under the 4.5:1 floor for 16px text. Dimming twice is what broke
+   it, and the previous gate could not see that because it injected
+   `opacity: 1 !important` before every scan. */
+.cl-hero-sub{margin:.4rem 0 0;font-size:clamp(.9rem,1.6vw,1.05rem);letter-spacing:.01em;color:var(--text-dim);}
 .cl-hero-desc{margin:.55rem 0 0;font-size:1rem;line-height:1.5;color:var(--text-dim);max-width:60ch;}
 .cl-hero-why{flex:0 1 min(40%,26rem);min-width:min(100%,15rem);border:1px solid var(--border);border-radius:10px;padding:.85rem 1.05rem;background:color-mix(in oklab,var(--cyan) 6%,transparent);}
 .cl-hero-why-label{display:block;font-size:.68rem;font-weight:700;letter-spacing:.14em;color:var(--cyan);}
@@ -483,7 +508,13 @@ body {
   border-radius: 3px;
   font-family: var(--font-mono);
   font-size: .92em;
-  white-space: nowrap;
+  /* A chip's text is often a compressed curve point — `P_pub = 8a3f…` runs to
+     hundreds of pixels. `white-space: nowrap` made those chips unbreakable, so
+     at 380px one of them pushed the document to 444px and the whole page
+     scrolled sideways (WCAG 1.4.10). The chip may wrap; what it may not do is
+     force the page to. */
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .vchip .vchip-ic { font-style: normal; }
 .vchip.v-public { color: var(--green); border-color: var(--green); }
@@ -542,13 +573,27 @@ body {
 /* Actor boxes */
 .flow-svg .actor-box { fill: var(--surface2); stroke: var(--border); stroke-width: 1.5; }
 .flow-svg .actor-label { fill: var(--text); font: 700 13px var(--font-mono); }
-.flow-svg .actor-role { fill: var(--text-dim); font: 11px var(--font-mono); }
+/* --svg-dim, not --text-dim: this text sits on the actor boxes and on the
+   tinted G_T node, not on the page. "the shared mask" inside the G_T node
+   measured 3.97:1 against that fill. --text-dim is correct everywhere it is
+   used on --bg and is left alone. */
+.flow-svg .actor-role { fill: var(--svg-dim); font: 11px var(--font-mono); }
 .flow-svg .gt-node { fill: color-mix(in oklab, var(--cyan) 12%, var(--surface2)); stroke: var(--cyan); stroke-width: 1.5; }
-.flow-svg .gt-node-label { fill: var(--cyan); font: 700 12px var(--font-mono); }
-/* Arrows: dim by default, lit when their step is active. */
-.flow-svg .arrow { stroke-width: 2; fill: none; opacity: .35; transition: opacity .2s, stroke-width .2s; }
-.flow-svg .arrow-head { opacity: .35; transition: opacity .2s; }
-.flow-svg .arrow-label { font: 11px var(--font-mono); opacity: .5; transition: opacity .2s; }
+/* --cyan on that 12% cyan tint is 4.01:1 in the light theme — a label and its
+   own background drifting toward the same hue. --cyan-deep is the same hue
+   carried far enough down to clear 4.5:1; in the dark theme it IS --cyan. */
+.flow-svg .gt-node-label { fill: var(--cyan-deep); font: 700 12px var(--font-mono); }
+/* Arrows: unlit by default, lit when their step is active.
+ *
+ * The distinction is carried by stroke width, dash pattern and font weight —
+ * NOT by opacity. It used to be `opacity: .35` on the arrows and `.5` on their
+ * labels, which painted "P_pub = s·P (public)" at 4.06:1 in the dark theme and
+ * 2.12:1 in the light one: the labels are the only place the diagram names what
+ * each arrow carries, and they were the least legible thing on the page. The
+ * gate this replaces injected `opacity: 1 !important` before scanning, so it
+ * measured the lit state of every arrow and reported the diagram clean. */
+.flow-svg .arrow { stroke-width: 2; fill: none; stroke-dasharray: 7 5; transition: stroke-width .2s, stroke-dasharray .2s; }
+.flow-svg .arrow-label { font: 11px var(--font-mono); transition: font-weight .2s; }
 .flow-svg .arrow.public { stroke: var(--green); }
 .flow-svg .arrow.public + .arrow-head, .flow-svg .arrow-head.public { fill: var(--green); }
 .flow-svg .arrow.secret { stroke: var(--gold); }
@@ -556,12 +601,11 @@ body {
 .flow-svg .arrow-label.public { fill: var(--green); }
 .flow-svg .arrow-label.secret { fill: var(--gold); }
 /* Active highlight — driven by a data-step attr on the <svg>. */
-.flow-svg [data-arrow].lit { opacity: 1; stroke-width: 3.5; }
-.flow-svg .arrow-head.lit { opacity: 1; }
-.flow-svg .arrow-label.lit { opacity: 1; font-weight: 700; }
+.flow-svg [data-arrow].lit { stroke-width: 3.5; stroke-dasharray: none; }
+.flow-svg .arrow-label.lit { font-weight: 700; }
 .flow-svg .gt-node.lit { stroke-width: 3; }
 @media (prefers-reduced-motion: reduce) {
-  .flow-svg .arrow, .flow-svg .arrow-head, .flow-svg .arrow-label { transition: none; }
+  .flow-svg .arrow, .flow-svg .arrow-label { transition: none; }
 }
 
 /* ─── Byte-grid (XOR masking visualiser) ─────────────────────────────────── */
@@ -687,6 +731,11 @@ body {
 
 /* Reduced motion support */
 @media (prefers-reduced-motion: reduce) {
-  .spinner { animation: none; opacity: 0.6; }
+  /* Cancelling the blink is the whole accommodation. The `opacity: 0.6` that
+     used to ride along with it composited "⧗ Running…" down to #545469 on the
+     terminal's #050508 — 2.76:1 — so asking not to be flashed at cost you the
+     ability to read the thing that was flashing, and ONLY for readers who
+     asked. An accommodation must not change the colour. */
+  .spinner { animation: none; }
   .btn, .tab-btn, .theme-toggle { transition: none; }
 }

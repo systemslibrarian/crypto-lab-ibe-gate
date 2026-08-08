@@ -288,7 +288,7 @@ const FLOW_STEPS: Record<string, FlowStep> = {
 function flowDiagram(): string {
   // Coordinates: PKG top-centre, Alice left, Bob right, G_T node bottom-centre.
   return `
-  <div class="flow-wrap" aria-labelledby="flow-h">
+  <div class="flow-wrap" role="group" aria-labelledby="flow-h">
     <h2 id="flow-h">The Protocol at a Glance</h2>
     <p class="flow-caption" id="flow-caption" aria-live="polite">Run a step below and this map lights the matching arrow — so you always see where that terminal output sits in the whole scheme. <span class="lbl-dim">Green = anyone can compute · gold = needs the master secret.</span></p>
     <svg class="flow-svg" id="flow-svg" viewBox="0 0 640 330" role="img" aria-label="Diagram of the IBE protocol: a PKG at top publishes public parameters to Alice and issues a private key to Bob; Alice sends a ciphertext to Bob; both sides' pairings meet at a shared G_T element in the centre.">
@@ -414,7 +414,7 @@ function renderApp() {
 
     ${flowDiagram()}
 
-    <div class="value-legend" aria-label="Public versus secret value key">
+    <div class="value-legend" role="group" aria-label="Public versus secret value key">
       <span class="vl-item">${chip('public', 'Q_ID, U, P_pub')}</span>
       <span class="vl-item vl-note">Derivable by anyone from public data.</span>
       <span class="vl-item">${chip('secret', 'd_ID')}</span>
@@ -508,7 +508,7 @@ function exhibit1(): string {
         </div>
       </details>
       <button class="btn btn-primary" id="btn-setup">▶ Run Setup</button>
-      <div class="term" id="term-setup" aria-live="polite" aria-label="Setup ceremony output">Waiting to run setup…</div>
+      <div class="term" id="term-setup" role="log" aria-live="polite" aria-label="Setup ceremony output">Waiting to run setup…</div>
     </div>
     <div class="card">
       <h2>First, The One Magic Property</h2>
@@ -521,11 +521,11 @@ function exhibit1(): string {
         <em>exact same</em> group element.
       </p>
       <button class="btn btn-primary" id="btn-bilinear">▶ Test Bilinearity (random a, b)</button>
-      <div class="term" id="term-bilinear" aria-live="polite" aria-label="Bilinearity test output">Waiting…</div>
+      <div class="term" id="term-bilinear" role="log" aria-live="polite" aria-label="Bilinearity test output">Waiting…</div>
     </div>
     <div class="card" id="card-setup-math" style="display:none">
       <h2>Why This Works</h2>
-      <div class="term" style="font-size:11px" aria-label="Mathematics explanation">
+      <div class="term" style="font-size:11px" role="group" aria-label="Mathematics explanation">
 e(d_ID, U) = e(s·Q_ID, r·P)
            = e(Q_ID, P)^(s·r)
            = e(Q_ID, s·P)^r
@@ -611,7 +611,7 @@ Generator P ∈ G2:
   <span class="lbl-cyan">${hexG2(P)}…</span>
 
 Generating master secret s ← random ∈ [1, r-1]
-  Master secret s: <span class="censor">████████████████████████████████████████</span> ${chip('master', 's — HIDDEN')}
+  Master secret s: <span class="censor" aria-hidden="true">████████████████████████████████████████</span> ${chip('master', 's — HIDDEN')}
 
 Computing P_pub = s · P ∈ G2:
   ${chip('public', `P_pub = ${hexG2(Ppub)}…`)}
@@ -675,17 +675,17 @@ function exhibit2(): string {
         <input id="enc-message" value="Q2 financials strictly confidential" autocomplete="off" />
       </div>
       <button class="btn btn-primary" id="btn-encrypt" disabled aria-disabled="true">🔒 Encrypt</button>
-      <div class="term" id="term-encrypt" aria-live="polite" aria-label="Encryption output">Run Setup first (Exhibit 1).</div>
+      <div class="term" id="term-encrypt" role="log" aria-live="polite" aria-label="Encryption output">Run Setup first (Exhibit 1).</div>
     </div>
     <div class="card" id="card-enroll" style="display:none">
       <h2>Bob Enrolls with PKG</h2>
       <button class="btn btn-gold" id="btn-enroll">👤 Bob Enrolls — PKG Extracts Key</button>
-      <div class="term" id="term-enroll" aria-live="polite" aria-label="Enrollment output">Waiting…</div>
+      <div class="term" id="term-enroll" role="log" aria-live="polite" aria-label="Enrollment output">Waiting…</div>
     </div>
     <div class="card" id="card-decrypt2" style="display:none">
       <h2>Bob Decrypts</h2>
       <button class="btn btn-primary" id="btn-decrypt2">🔓 Decrypt</button>
-      <div class="term" id="term-decrypt2" aria-live="polite" aria-label="Decryption output">Waiting…</div>
+      <div class="term" id="term-decrypt2" role="log" aria-live="polite" aria-label="Decryption output">Waiting…</div>
     </div>
   </div>`;
 }
@@ -734,7 +734,7 @@ Compute Q_ID = H₁("${identity}") ∈ G1  (RFC 9380 hash-to-curve):
   <span class="lbl-dim">^ this point IS Bob's public key — anyone can derive it from his email.</span>
 
 Pick random r ← [1, r-1]:
-  r = <span class="censor">████████████████</span> (discarded after encryption)
+  r = <span class="censor" aria-hidden="true">████████████████</span> (discarded after encryption)
 
 U = r · P ∈ G2  (96 bytes) — travels to Bob as part of the ciphertext:
   ${chip('public', `U = ${hexG2(_ct2.U)}…`)}
@@ -876,11 +876,11 @@ function exhibit3(): string {
       <div class="cols-2" style="margin-top:14px">
         <div>
           <div style="color:var(--green);font-size:11px;margin-bottom:6px;text-transform:uppercase;" aria-hidden="true">Alice Decrypts (correct key)</div>
-          <div class="term" id="term-wk-alice" aria-live="polite" aria-label="Alice decryption output">Waiting…</div>
+          <div class="term" id="term-wk-alice" role="log" aria-live="polite" aria-label="Alice decryption output">Waiting…</div>
         </div>
         <div>
           <div style="color:var(--red);font-size:11px;margin-bottom:6px;text-transform:uppercase;" aria-hidden="true">Eve Decrypts (wrong key)</div>
-          <div class="term" id="term-wk-eve" aria-live="polite" aria-label="Eve decryption output (wrong key)">Waiting…</div>
+          <div class="term" id="term-wk-eve" role="log" aria-live="polite" aria-label="Eve decryption output (wrong key)">Waiting…</div>
         </div>
       </div>
     </div>
@@ -1021,11 +1021,11 @@ function exhibit4(): string {
       </fieldset>
 
       <button class="btn btn-primary" id="btn-timelimit-run" disabled aria-disabled="true">▶ Run Scenario</button>
-      <div class="term" id="term-timelimit" aria-live="polite" aria-label="Time-limited scenario output">Run Setup first (Exhibit 1).</div>
+      <div class="term" id="term-timelimit" role="log" aria-live="polite" aria-label="Time-limited scenario output">Run Setup first (Exhibit 1).</div>
     </div>
     <div class="card">
       <h2>Real-World Applications</h2>
-      <div class="term" style="font-size:11px" aria-label="Real-world application examples">
+      <div class="term" style="font-size:11px" role="group" aria-label="Real-world application examples">
 Identity string as policy expression:
   "bob@example.com || 2026-05-15"    ← dated private key
   "alice@corp.com || project-x"      ← project-scoped access
@@ -1171,7 +1171,7 @@ function exhibit5(): string {
         <input id="escrow-message" value="Board meeting: vote to oust the CFO Thursday" autocomplete="off" />
       </div>
       <button class="btn btn-danger" id="btn-escrow-run" disabled aria-disabled="true">🔑 PKG Decrypts Everything</button>
-      <div class="term" id="term-escrow" aria-live="polite" aria-label="Escrow demonstration output">Run Setup first (Exhibit 1).</div>
+      <div class="term" id="term-escrow" role="log" aria-live="polite" aria-label="Escrow demonstration output">Run Setup first (Exhibit 1).</div>
     </div>
     <div class="card">
       <h2>The Tradeoff</h2>
