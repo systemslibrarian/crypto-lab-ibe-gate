@@ -13,6 +13,7 @@ import {
 } from './ibe.ts';
 import { hashToG1, gtToBytes, hashGTtoBytes, pairing } from './pairing.ts';
 import { demonstrateKeyEscrow } from './scenarios.ts';
+import { byteColor } from './palette.ts';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -104,15 +105,10 @@ function loading(id: string): void {
 
 // ─── Teaching helpers (visualisation only — never touch the crypto) ──────────
 
-// Deterministic colour for a byte value so that identical bytes render
-// identically across grids. This lets a learner SEE that plaintext ⊕ mask = V
-// and that Eve's wrong mask produces a different-looking V. It is a pure
-// display function of the real byte values — it invents nothing.
-function byteColor(b: number): string {
-  const hue = Math.round((b / 255) * 360);
-  const light = 32 + (b % 48); // 32–80% — keeps every cell visibly distinct
-  return `hsl(${hue} 70% ${light}%)`;
-}
+// `byteColor` — the deterministic byte→colour map — lives in ./palette.ts,
+// where it can be unit-tested against the 3:1 floor every cell has to clear
+// against the grid gap (WCAG 1.4.11). It is a pure display function of the real
+// byte values; it invents nothing.
 
 function hexByte(b: number): string {
   return b.toString(16).padStart(2, '0');
@@ -122,14 +118,13 @@ function hexByte(b: number): string {
 // hex value in title + aria-label, so meaning never rests on colour alone.
 function byteGrid(
   bytes: Uint8Array,
-  opts: { cls?: string; hidden?: boolean } = {}
+  opts: { hidden?: boolean } = {}
 ): string {
-  const cellCls = 'byte-cell' + (opts.cls ? ' ' + opts.cls : '');
   const cells = Array.from(bytes)
     .map((b, i) => {
       const label = `byte ${i}: 0x${hexByte(b)}`;
       const hide = opts.hidden ? ' mask-hidden' : '';
-      return `<span class="${cellCls}${hide}" role="img" aria-label="${label}" title="${label}" style="background:${byteColor(
+      return `<span class="byte-cell${hide}" role="img" aria-label="${label}" title="${label}" style="background:${byteColor(
         b
       )}" data-byte="${i}"></span>`;
     })
@@ -163,7 +158,7 @@ function xorViz(
   <div class="xor-viz" id="${opts.id}" role="group" aria-label="Byte-by-byte XOR: ${opts.topLabel} XOR mask equals ${opts.resultLabel}">
     <div class="xor-row">
       <div class="xor-row-label">${opts.topLabel}<span class="xr-sub">${opts.topSub}</span></div>
-      ${byteGrid(top, { cls: 'plain', hidden: false })}
+      ${byteGrid(top, { hidden: false })}
     </div>
     <div class="op-symbol" aria-hidden="true">⊕  XOR with the pairing-derived mask</div>
     <div class="xor-row">

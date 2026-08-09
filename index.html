@@ -38,7 +38,11 @@
   .cl-btn{
     display:inline-flex;align-items:center;gap:.4rem;
     padding:.5rem .85rem;border-radius:10px;
-    border:1px solid color-mix(in srgb, var(--accent, #35d6bb) 38%, transparent);
+    /* 52%, not 38%. These three controls have a transparent fill, so this
+       border is the ONLY thing delineating them from the bar (WCAG 2.1 SC
+       1.4.11 wants 3:1). At 38% it composited to rgb(27,94,82) on the bar's
+       #0b1512 — 2.45:1, measured off a screenshot. 52% gives 3.55:1. */
+    border:1px solid color-mix(in srgb, var(--accent, #35d6bb) 52%, transparent);
     background:transparent;color:var(--cl-ink);cursor:pointer;
     font:inherit;font-size:.78rem;font-weight:700;letter-spacing:.1em;
     text-transform:uppercase;text-decoration:none;transition:background .15s,border-color .15s,color .15s;

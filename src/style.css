@@ -4,11 +4,17 @@
   --surface: #13131a;
   --surface2: #1c1c28;
   --border: #2a2a3a;
-  /* Control boundaries only (WCAG 2.1 SC 1.4.11). `.field-row input` /
-     `.field-row textarea` are filled with --surface2 (#1c1c28) inside a --surface
-     (#13131a) card — 1.15:1 — so the border is the only thing delineating the
-     field. --border is 1.40:1 on --bg, 1.20:1 on --surface2. #6a6a75 is derived
-     from it along the same slate hue: 3.69:1 on --bg, 3.46:1 on --surface,
+  /* Control and meaningful-graphic boundaries (WCAG 2.1 SC 1.4.11) — every
+     edge a reader has to SEE to find a control or read the diagram, as opposed
+     to the decorative card edges that use --border.
+     `.field-row input` / `.field-row textarea` are filled with --surface2
+     (#1c1c28) inside a --surface (#13131a) card — 1.15:1 — so the border is the
+     only thing delineating the field. The same was true of `.tab-btn` (fill
+     1.07:1 on --bg) and of the protocol diagram's `.actor-box` (fill 1.10:1 on
+     the panel), which both drew their edge in --border and so had NO visible
+     boundary at all: 1.40:1 and 1.31:1 measured off a screenshot.
+     --border is 1.40:1 on --bg, 1.20:1 on --surface2. #6a6a75 is derived
+     from it along the same slate hue: 3.70:1 on --bg, 3.46:1 on --surface,
      3.15:1 on --surface2.
 
      Do NOT reuse this for --border, and do NOT fold --border into it. .term,
@@ -181,7 +187,14 @@ body {
 
 .tab-btn {
   background-color: var(--surface);
-  border: 1px solid var(--border);
+  /* Load-bearing control boundary (WCAG 2.1 SC 1.4.11), same as the inputs.
+     An unselected tab's fill is 1.07:1 on --bg, so the border is the only
+     thing that says a tab is there; in --border it measured 1.40:1 (dark) and
+     2.05:1 (light) off a screenshot — four of the five tabs were invisible
+     boxes, and this strip is the lab's whole navigation. The selected tab
+     overrides both colours below and was always fine, which is exactly why
+     this went unnoticed. */
+  border: 1px solid var(--border-strong);
   color: var(--text-dim);
   padding: 10px 14px;
   min-height: 44px;
@@ -570,8 +583,13 @@ body {
 }
 .flow-caption strong { color: var(--text); }
 .flow-svg { width: 100%; height: auto; display: block; }
-/* Actor boxes */
-.flow-svg .actor-box { fill: var(--surface2); stroke: var(--border); stroke-width: 1.5; }
+/* Actor boxes. --border-strong, not --border: these five rectangles ARE the
+   diagram — the thing a reader has to see to know there are five parties — and
+   their fill is 1.10:1 (dark) / 1.17:1 (light) on the panel behind them, so the
+   stroke is the only boundary. In --border it measured 1.31:1 and 2.25:1.
+   Nothing in the fleet's oracles reaches an SVG shape's stroke; this was found
+   by sampling the screenshot. */
+.flow-svg .actor-box { fill: var(--surface2); stroke: var(--border-strong); stroke-width: 1.5; }
 .flow-svg .actor-label { fill: var(--text); font: 700 13px var(--font-mono); }
 /* --svg-dim, not --text-dim: this text sits on the actor boxes and on the
    tinted G_T node, not on the page. "the shared mask" inside the G_T node
@@ -641,7 +659,12 @@ body {
   border-radius: 2px;
   /* value carried by aria-label / title, not colour alone */
 }
-.byte-cell.plain { outline: 1px solid rgba(0, 212, 255, .35); outline-offset: -1px; }
+/* No ring on the top row. `.byte-cell.plain` used to draw
+   `1px solid rgba(0,212,255,.35)` inset into each cell of the first grid: over
+   the cell's own fill that composites to 1.07:1, so it drew nothing a reader
+   could see, and it was applied to whatever the top row held — M when
+   encrypting, V when decrypting — so its name was wrong half the time. What the
+   row is is carried by `.xor-row-label`, in words. */
 .op-symbol {
   grid-column: 2;
   color: #8888aa;
@@ -650,10 +673,10 @@ body {
   margin: -4px 0 0 2px;
 }
 .xor-legend { font-size: 10.5px; color: #8888aa; margin-top: 10px; line-height: 1.5; }
-.xor-legend .xl-swatch {
-  display: inline-block; width: 10px; height: 10px; border-radius: 2px;
-  vertical-align: middle; margin: 0 3px 0 8px; outline: 1px solid rgba(255,255,255,.25);
-}
+/* (`.xl-swatch` was styled here for a legend swatch this lab never renders. A
+   rule with no element is a trap for the next contrast pass — it reads as a
+   boundary to check and cannot be measured — so it is gone rather than kept
+   "in case".) */
 /* cell fade-in for the XOR animation */
 .byte-cell.mask-hidden { visibility: hidden; }
 @keyframes cellpop { from { transform: scale(.35); } to { transform: scale(1); } }
