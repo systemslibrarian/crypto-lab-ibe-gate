@@ -6,10 +6,14 @@ import { defineConfig } from '@playwright/test';
  * Pages. The build runs as part of the webServer command, so a run always
  * tests the current source rather than whatever bundle is sitting in dist/.
  *
- * The port is fixed by default so CI stays deterministic; E2E_PORT lets a
- * local run step around a port another lab's preview server already holds.
+ * The port is fixed by default so CI stays deterministic, and must be unique
+ * across the crypto-lab fleet: `reuseExistingServer` adopts whatever already
+ * listens on it, so a shared port lets this suite scan a sibling lab's page
+ * and report its findings as ours. 4223 collided with
+ * crypto-lab-harvest-vault. E2E_PORT stays as a local escape hatch, but it
+ * was never the fix — what has to be unique is the committed default.
  */
-const PORT = Number(process.env.E2E_PORT ?? 4223);
+const PORT = Number(process.env.E2E_PORT ?? 4677);
 const TARGET = `http://localhost:${PORT}/crypto-lab-ibe-gate/`;
 
 export default defineConfig({
