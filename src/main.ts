@@ -396,7 +396,6 @@ function renderApp() {
         <span class="cl-hero-why-label">WHY IT MATTERS</span>
         <p class="cl-hero-why-text">IBE strips away the certificate plumbing that makes public-key crypto hard to deploy. The catch: the key-generating server can derive anyone's private key, so it can read every message — the escrow tradeoff you must weigh.</p>
       </aside>
-      <button class="theme-toggle" id="theme-toggle" aria-label="Toggle light/dark theme">Toggle Theme</button>
     </header>
 
     <div class="warning-box" role="note" aria-label="Security note">
@@ -458,14 +457,6 @@ function renderApp() {
       panel.classList.add('active');
       panel.setAttribute('aria-hidden', 'false');
     });
-  });
-
-  // Theme toggle
-  document.getElementById('theme-toggle')!.addEventListener('click', () => {
-    const cur = document.documentElement.getAttribute('data-theme');
-    const next = cur === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    localStorage.setItem('theme', next);
   });
 
   wireExhibit1();
