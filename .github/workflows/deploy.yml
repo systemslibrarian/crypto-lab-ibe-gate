@@ -14,7 +14,7 @@ permissions:
 
 concurrency:
   group: pages-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -31,7 +31,14 @@ jobs:
         run: npm test
       - run: npm run build
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        # The runner's preferred Azure HTTP mirror can stall while Playwright
+        # installs Ubuntu browser dependencies. Use Ubuntu's official HTTPS
+        # archive mirror; keep the full dependency install and browser/a11y gate.
+        run: |
+          if [ -f /etc/apt/apt-mirrors.txt ]; then
+            sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' /etc/apt/apt-mirrors.txt
+          fi
+          npx playwright install --with-deps chromium
       - name: Accessibility gate (axe-core, WCAG A/AA)
         run: npm run test:a11y
       - uses: actions/upload-pages-artifact@v5
