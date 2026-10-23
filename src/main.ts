@@ -87,7 +87,7 @@ function truncNote(msg: string, n: number): string {
   const kept = fitted(msg, n);
   if (kept === msg) return '';
   return `\n<span class="lbl-amber">  Note: BasicIdent's message space here is exactly ${n} bytes, so only
-  "${kept}" was encrypted — the rest of your input was cut before encryption.</span>`;
+  "${escapeHtml(kept)}" was encrypted — the rest of your input was cut before encryption.</span>`;
 }
 
 function setHTML(id: string, html: string) {
