@@ -531,3 +531,36 @@ test('the protocol map lights the arrow for the step that just ran', async ({
   await expect(page.locator('#flow-svg [data-arrow="pairA"].lit')).toHaveCount(1);
   await expect(page.locator('#flow-svg [data-arrow="pairB"].lit')).toHaveCount(1);
 });
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Exhibit 6 — real HIBE delegation
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('HIBE exhibit executes descendant delegation and a cryptographic sibling failure', async ({ page }) => {
+  await boot(page);
+  await page.locator('#tab-hibe').click();
+  await expect(page.locator('#panel-hibe')).toBeVisible();
+
+  await page.locator('#hibe-root').fill('northstar');
+  await page.locator('#hibe-dept').fill('security');
+  await page.locator('#hibe-user').fill('carol');
+  await page.locator('#hibe-message').fill('Delegated keys stay in subtree');
+  await page.locator('#btn-hibe-run').click();
+
+  await expect(page.locator('#btn-hibe-run')).toBeEnabled({ timeout: 120_000 });
+  const out = await term(page, 'term-hibe');
+
+  expect(out).toContain('[northstar] → [northstar / security]');
+  expect(out).toContain('[northstar / security] → [northstar / security / carol]');
+  expect(out).toContain('✓ DESCENDANT KEY DECRYPTS');
+  expect(out).toContain('✓ PKG ESCROW STILL REACHES THIS BRANCH');
+  expect(out).toContain('wrong branch = [northstar / hr / carol]');
+  expect(out).toContain("recovered G_T secret equals sender's: NO");
+  expect(out).toContain('plaintext equals target plaintext: NO');
+  expect(out).toContain('✓ SIBLING BRANCH CANNOT OPEN IT');
+
+  // The learner-facing boundary must come from the same-depth cryptographic
+  // computation, not from refusing to run because the labels differ.
+  expect(out).toContain('pairing math executed at the same depth');
+});

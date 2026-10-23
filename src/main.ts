@@ -11,7 +11,16 @@ import {
   type IBESystem,
   type IBECiphertext,
 } from './ibe.ts';
-import { hashToG1, gtToBytes, hashGTtoBytes, pairing } from './pairing.ts';
+import {
+  setupHIBE,
+  keyGenHIBE,
+  delegateHIBE,
+  encryptHIBE,
+  decryptHIBE,
+  recoverHIBESecret,
+  isIdentityPrefix,
+} from './hibe.ts';
+import { hashToG1, gtToBytes, hashGTtoBytes, pairing, gtEquals } from './pairing.ts';
 import { demonstrateKeyEscrow } from './scenarios.ts';
 import { byteColor } from './palette.ts';
 
@@ -78,12 +87,21 @@ function truncNote(msg: string, n: number): string {
   const kept = fitted(msg, n);
   if (kept === msg) return '';
   return `\n<span class="lbl-amber">  Note: BasicIdent's message space here is exactly ${n} bytes, so only
-  "${kept}" was encrypted — the rest of your input was cut before encryption.</span>`;
+  "${escapeHtml(kept)}" was encrypted — the rest of your input was cut before encryption.</span>`;
 }
 
 function setHTML(id: string, html: string) {
   const el = document.getElementById(id);
   if (el) el.innerHTML = html;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
 
 function getVal(id: string): string {
@@ -423,6 +441,7 @@ function renderApp() {
       <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-wrongkey"  id="tab-wrongkey"  data-tab="wrongkey">3 · Wrong Key = Garbage</button>
       <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-timelimit" id="tab-timelimit" data-tab="timelimit">4 · Time-Limited</button>
       <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-escrow"    id="tab-escrow"    data-tab="escrow">5 · PKG Escrow Tradeoff</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-hibe"      id="tab-hibe"      data-tab="hibe">6 · HIBE Delegation</button>
     </nav>
 
     <main id="main-content">
@@ -431,6 +450,7 @@ function renderApp() {
       ${exhibit3()}
       ${exhibit4()}
       ${exhibit5()}
+      ${exhibit6()}
     </main>
 <footer style="margin-top:3rem;padding:2rem 1rem;border-top:1px solid rgba(128,128,128,.25);text-align:center;font-size:.85rem;line-height:1.9;font-family:ui-monospace,Menlo,Consolas,monospace">
   <div><strong>Related demos:</strong> <a href="https://systemslibrarian.github.io/crypto-lab-pairing-gate/" style="color:var(--cyan)">pairing-gate</a> &middot; <a href="https://systemslibrarian.github.io/crypto-lab-iron-letter/" style="color:var(--cyan)">iron-letter</a> &middot; <a href="https://systemslibrarian.github.io/crypto-lab-pki-chain/" style="color:var(--cyan)">pki-chain</a> &middot; <a href="https://systemslibrarian.github.io/crypto-lab-envelope-kms/" style="color:var(--cyan)">envelope-kms</a></div>
@@ -464,6 +484,7 @@ function renderApp() {
   wireExhibit3();
   wireExhibit4();
   wireExhibit5();
+  wireExhibit6();
 }
 
 // ─── Exhibit 1: Setup Ceremony ────────────────────────────────────────────────
@@ -1264,5 +1285,165 @@ of what you typed:
 <span class="lbl-dim">This is why IBE requires absolute trust in the PKG.
 The escrow is a design decision — not an accident.</span>
     `.trim());
+  });
+}
+
+
+// ─── Exhibit 6: Executable HIBE delegation ────────────────────────────────────
+
+function exhibit6(): string {
+  return `
+  <div class="panel" id="panel-hibe" role="tabpanel" aria-labelledby="tab-hibe" aria-hidden="true">
+    <div class="card">
+      <h2>Exhibit 6 — A Parent Key Really Derives Its Descendant</h2>
+      <p style="color:var(--text-dim);margin-bottom:14px;font-size:13px;">
+        This is a separate Type-3 HIBE construction, not Boneh–Franklin BasicIdent with slashes in a string.
+        The PKG issues only the root key. That root key delegates to a department, and the department delegates
+        again to a user <strong>without receiving the master secret</strong>.
+      </p>
+      <div class="field-row">
+        <label for="hibe-root">Root identity</label>
+        <input id="hibe-root" value="acme" autocomplete="off" />
+      </div>
+      <div class="field-row">
+        <label for="hibe-dept">Department</label>
+        <input id="hibe-dept" value="finance" autocomplete="off" />
+      </div>
+      <div class="field-row">
+        <label for="hibe-user">User</label>
+        <input id="hibe-user" value="alice" autocomplete="off" />
+      </div>
+      <div class="field-row">
+        <label for="hibe-message">Message (max 32 bytes)</label>
+        <input id="hibe-message" value="Quarterly forecast: internal" autocomplete="off" />
+      </div>
+      <button class="btn btn-primary" id="btn-hibe-run">🌳 Run real delegation</button>
+      <div class="term" id="term-hibe" role="log" aria-live="polite" aria-label="Hierarchical IBE delegation output">Ready to build a three-level hierarchy.</div>
+    </div>
+
+    <div class="card">
+      <h2>What this proves — and what it does not</h2>
+      <div class="term" style="font-size:11px;white-space:pre-wrap">
+<span class="lbl-green">Real in this exhibit</span>
+• Type-3 asymmetric BLS12-381 pairings
+• Parent → child and child → grandchild key delegation
+• Fresh and delegated keys for the same identity both decrypt
+• A same-depth sibling key runs the pairing math and lands on the wrong G_T secret
+• The PKG can still freshly extract any branch: root escrow remains
+
+<span class="lbl-amber">Deliberate limits</span>
+• Bounded depth 3 for the learner exercise
+• Text components are domain-separated and hashed to Z_r
+• The paper encrypts G_T elements directly; this demo hashes the recovered G_T element to a 32-byte mask
+• This KEM/DEM teaching adaptation does not claim the paper's full security proof
+      </div>
+      <p style="color:var(--text-dim);margin-top:12px;font-size:12px;">
+        Construction basis: Ramanna, Chatterjee &amp; Sarkar, Appendix G, extending their asymmetric-pairing Scheme 6.
+      </p>
+    </div>
+  </div>`;
+}
+
+function wireExhibit6(): void {
+  document.getElementById('btn-hibe-run')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-hibe-run') as HTMLButtonElement;
+    const root = getVal('hibe-root');
+    const dept = getVal('hibe-dept');
+    const user = getVal('hibe-user');
+    const msg = getVal('hibe-message');
+
+    if (!root || !dept || !user) {
+      setHTML('term-hibe', '<span class="lbl-red">Enter all three identity components.</span>');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.setAttribute('aria-disabled', 'true');
+    loading('term-hibe');
+
+    try {
+      const system = setupHIBE(3, MSG_BYTES);
+      const rootKey = keyGenHIBE([root], system.masterKey, system.params);
+      const deptKey = delegateHIBE(rootKey, dept, system.params);
+      const userKey = delegateHIBE(deptKey, user, system.params);
+      const target = [root, dept, user];
+
+      const message = pad(msg, MSG_BYTES);
+      const ct = await encryptHIBE(message, target, system.params);
+      const delegatedPlain = await decryptHIBE(ct, userKey, system.params);
+      const delegatedShared = recoverHIBESecret(ct, userKey);
+
+      const freshKey = keyGenHIBE(target, system.masterKey, system.params);
+      const freshPlain = await decryptHIBE(ct, freshKey, system.params);
+
+      const siblingName = dept.toLowerCase() === 'hr' ? 'finance' : 'hr';
+      const siblingDept = delegateHIBE(rootKey, siblingName, system.params);
+      const siblingUser = delegateHIBE(siblingDept, user, system.params);
+      const siblingShared = recoverHIBESecret(ct, siblingUser);
+      const siblingPlain = await decryptHIBE(ct, siblingUser, system.params);
+
+      const delegatedOk = unpad(delegatedPlain) === fitted(msg, MSG_BYTES);
+      const freshOk = unpad(freshPlain) === fitted(msg, MSG_BYTES);
+      const siblingSecretDiffers = !gtEquals(siblingShared, ct._demoShared);
+      const siblingPlainDiffers = Array.from(siblingPlain).some((b, i) => b !== message[i]);
+      const subtree = isIdentityPrefix([root, dept], target);
+      const siblingIsOutside = !isIdentityPrefix([root, dept], [root, siblingName, user]);
+      const shown = {
+        root: escapeHtml(root),
+        dept: escapeHtml(dept),
+        user: escapeHtml(user),
+        sibling: escapeHtml(siblingName),
+        target: target.map(escapeHtml).join(' / '),
+        delegatedPlain: escapeHtml(unpad(delegatedPlain)),
+        freshPlain: escapeHtml(unpad(freshPlain)),
+      };
+
+      setHTML('term-hibe', `
+<span class="lbl-cyan">TYPE-3 HIBE — EXECUTABLE DELEGATION</span>
+<span class="lbl-dim">───────────────────────────────────────────────</span>
+
+PKG fresh extraction:
+  root key = [${shown.root}]
+  master secret used here: <span class="lbl-gold">YES</span>
+
+Parent delegation — no master-secret input:
+  [${shown.root}] → [${shown.root} / ${shown.dept}]
+  [${shown.root} / ${shown.dept}] → [${shown.target}]
+  department key covers target subtree: <span class="${subtree ? 'lbl-green' : 'lbl-red'}">${subtree ? 'YES' : 'NO'}</span>
+
+Ciphertext target:
+  [${shown.target}]
+
+Delegated descendant decrypt:
+  recovered = "${shown.delegatedPlain}"
+  sender/recipient G_T secret match: <span class="${gtEquals(delegatedShared, ct._demoShared) ? 'lbl-green' : 'lbl-red'}">${gtEquals(delegatedShared, ct._demoShared) ? 'YES' : 'NO'}</span>
+  verdict: <span class="${delegatedOk ? 'lbl-green' : 'lbl-red'}">${delegatedOk ? '✓ DESCENDANT KEY DECRYPTS' : '✗ FAILED'}</span>
+
+Fresh PKG key for the same target:
+  recovered = "${shown.freshPlain}"
+  verdict: <span class="${freshOk ? 'lbl-green' : 'lbl-red'}">${freshOk ? '✓ PKG ESCROW STILL REACHES THIS BRANCH' : '✗ FAILED'}</span>
+
+Sibling compromise:
+  wrong branch = [${shown.root} / ${shown.sibling} / ${shown.user}]
+  outside [${shown.root} / ${shown.dept}] subtree: <span class="${siblingIsOutside ? 'lbl-green' : 'lbl-red'}">${siblingIsOutside ? 'YES' : 'NO'}</span>
+  pairing math executed at the same depth
+  recovered G_T secret equals sender's: <span class="${siblingSecretDiffers ? 'lbl-red' : 'lbl-green'}">${siblingSecretDiffers ? 'NO' : 'YES'}</span>
+  plaintext equals target plaintext: <span class="${siblingPlainDiffers ? 'lbl-red' : 'lbl-green'}">${siblingPlainDiffers ? 'NO' : 'YES'}</span>
+  verdict: <span class="${siblingSecretDiffers && siblingPlainDiffers ? 'lbl-green' : 'lbl-red'}">${siblingSecretDiffers && siblingPlainDiffers ? '✓ SIBLING BRANCH CANNOT OPEN IT' : '✗ BOUNDARY FAILED'}</span>
+
+<span class="lbl-amber">What hierarchy changes:</span>
+  The root PKG no longer has to issue every descendant key itself.
+  A delegated node can create keys only below its own identity prefix.
+  Compromising [${shown.root} / ${shown.dept}] exposes that subtree's future delegations,
+  but not the sibling [${shown.root} / ${shown.sibling}] branch.
+  The root PKG still retains escrow over every branch.
+${truncNote(msg, MSG_BYTES)}
+      `.trim());
+    } catch (e) {
+      setHTML('term-hibe', `<span class="lbl-red">ERROR: ${e}</span>`);
+    } finally {
+      btn.disabled = false;
+      btn.setAttribute('aria-disabled', 'false');
+    }
   });
 }

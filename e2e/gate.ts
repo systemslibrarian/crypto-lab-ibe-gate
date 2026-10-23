@@ -119,7 +119,7 @@ export async function boot(page: Page, theme: 'dark' | 'light'): Promise<void> {
   // re-highlights.
   await expect(page.locator('#btn-setup')).toBeVisible();
   await expect(page.locator('#flow-svg')).toBeVisible();
-  await expect(page.locator('.tab-btn')).toHaveCount(5);
+  await expect(page.locator('.tab-btn')).toHaveCount(6);
   // …and that the exhibits really are empty here, so a scan of this state is
   // measuring the shell rather than silently measuring nothing.
   await expect(page.locator('#term-setup')).toHaveText('Waiting to run setup…');
@@ -438,4 +438,12 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   await expect(page.locator('#btn-escrow-run')).toBeEnabled({ timeout: 120_000 });
   await expect(page.locator('#term-escrow')).not.toHaveText('Run Setup first (Exhibit 1).');
   await scan(page, `${theme} / PKG decrypts a message it was never sent`);
+
+  // ── Exhibit 6: executable HIBE delegation and sibling boundary ───────────
+  await openTab(page, 'hibe');
+  await page.locator('#btn-hibe-run').click();
+  await expect(page.locator('#btn-hibe-run')).toBeEnabled({ timeout: 120_000 });
+  await expect(page.locator('#term-hibe')).toContainText('DESCENDANT KEY DECRYPTS', { timeout: 120_000 });
+  await expect(page.locator('#term-hibe')).toContainText('SIBLING BRANCH CANNOT OPEN IT');
+  await scan(page, `${theme} / HIBE parent delegation and sibling branch boundary`);
 }

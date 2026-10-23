@@ -10,6 +10,13 @@ Demonstrates encryption to unenrolled recipients, time-limited capabilities via 
 policy, role-based encryption, and the fundamental key-escrow tradeoff where the Private Key
 Generator can decrypt any message in the system.
 
+A sixth exhibit adds **real hierarchical key delegation** using the Type-3 HIBE extension of
+Ramanna, Chatterjee & Sarkar's asymmetric-pairing Scheme 6 (Appendix G of
+[ePrint 2012/024](https://eprint.iacr.org/2012/024)). The root key delegates a department key, that
+key delegates a user key without receiving the master secret, and a same-depth sibling key is allowed
+to run the pairing algebra and demonstrably recovers the wrong GT secret. This is a separate HIBE
+construction; slash-separated Boneh-Franklin identities are not presented as delegation.
+
 **One deliberate deviation from the paper.** Boneh-Franklin define BasicIdent over a *symmetric*
 admissible bilinear map `ê: G1 × G1 → G2` — Q_ID, P, P_pub and the ciphertext component rP all
 live in the same group, and the security reduction is to BDH in ⟨G1, G2, ê⟩. BLS12-381 has no
@@ -43,9 +50,15 @@ fingerprint.
 
 Run the full Boneh-Franklin BasicIdent protocol in the browser: a Private Key Generator runs setup, extracts a private key for an identity string, and you encrypt a message to any identity and decrypt it — every step over real BLS12-381 pairings via `@noble/curves`. The demo shows encryption to unenrolled recipients, time-limited and role-based identities encoded directly in the identity string, and makes the key-escrow tradeoff concrete by letting the PKG's master secret derive any user's key. The time-limited exhibit lets *you* play the PKG at an issuance gate — issue, refuse, or collude — to make explicit that a date baked into an identity is inert text; the time-lock is enforced by the PKG's issuance policy, not by the string, and a compromised PKG can hand out the off-date key anyway.
 
+The HIBE tab builds a three-level hierarchy in a fresh Type-3 system, extracts only the root key with
+the master secret, delegates department and user keys recursively, encrypts to the descendant, and
+compares that successful path with a sibling branch that executes the same-depth decryption math but
+lands on the wrong GT secret. It also freshly extracts the target key at the PKG to show that hierarchy
+reduces routine root issuance without removing root escrow.
+
 ## What Can Go Wrong
 
-- **The PKG can decrypt every message.** Master secret `s` lets PKG derive any identity's private key. This is architectural, not a bug. Organizations deploying IBE must either accept this (for compliance) or use Hierarchical/Threshold/Distributed variants.
+- **The PKG can decrypt every message.** Master secret `s` lets PKG derive any identity's private key. This is architectural, not a bug. The HIBE exhibit reduces how often the root must issue descendant keys, but the root PKG can still freshly extract every branch; HIBE delegation does not remove root escrow.
 - BasicIdent is IND-CPA but not IND-CCA. An active attacker can modify ciphertexts. Production systems use FullIdent (Boneh-Franklin 2001 Section 4.2) with a Fujisaki-Okamoto transform for IND-CCA security.
 - Private keys must be transmitted securely from PKG to user. This requires out-of-band authentication — the PKG has to know the user is who they claim to be before issuing `d_ID`.
 - Revocation is hard. Unlike PKI where certificates can be revoked, an issued IBE private key is valid forever for that identity. Workarounds use short-lived identities (email || timestamp) or include revocation lists.
@@ -67,7 +80,7 @@ npm run dev
 ## Run the Tests
 
 ```bash
-npm test        # 21 Vitest crypto unit tests (Boneh-Franklin over BLS12-381)
+npm test        # 35 Vitest tests total (31 pairing/IBE/HIBE + 4 palette tests)
 npm run build       # tsc + production bundle (the browser gate runs against this)
 npm run test:a11y   # Playwright: functional gate + axe-core WCAG A/AA, both themes
 ```
@@ -85,7 +98,9 @@ npm run test:a11y   # Playwright: functional gate + axe-core WCAG A/AA, both the
   "0 mismatches" counter is checked against the actual number of diff-coloured
   cells in the 576-byte dump the same run produced. All three failure paths are
   covered — Eve's wrong-identity key, the PKG's REFUSE policy, and the colluding
-  PKG — each asserted to reach its failure state *and* to say why.
+  PKG — each asserted to reach its failure state *and* to say why. The HIBE claim test additionally
+  drives a custom three-level identity, requires descendant decryption, and checks that the sibling
+  branch reports a different recovered GT secret and plaintext after the pairing math actually runs.
 - **`e2e/a11y.spec.ts`** — axe-core WCAG 2.1 A/AA over every exhibit, both themes.
 
 The unit suite (`test/ibe.test.ts`) runs against the real `@noble/curves`
@@ -97,6 +112,22 @@ pairing — no mocks — and covers:
 - **Forgery rejection:** a wrong-identity key or a foreign PKG's master secret does NOT recover the plaintext.
 - **Key escrow:** a PKG-derived key decrypts any identity (the architectural tradeoff, asserted rather than asserted-away).
 - **Primitive correctness:** deterministic `H₁` hash-to-curve into the prime-order subgroup, deterministic length-correct `H₂` XOF, and semantic security via fresh randomness `r` per encryption.
+
+The separate HIBE suite (`test/hibe.test.ts`) checks fresh depth-1/2/3 keys, parent→child and
+recursive delegation without the master secret, fresh/delegated correctness for the same identity,
+structural rejection of a too-shallow parent key, same-depth sibling failure through the actual pairing
+algebra, maximum-depth enforcement, and retained root-PKG escrow.
+
+### HIBE construction and limits
+
+The HIBE core follows Appendix G of Ramanna, Chatterjee & Sarkar, *Variants of Waters' Dual-System
+Primitives Using Asymmetric Pairings*. That construction is explicitly for a Type-3 pairing
+`e: G1 × G2 → GT`: public ciphertext components are in G1 while delegated/decryption-key components
+are in G2. Text identity components are domain-separated and hashed to scalars in `Z_r` for this lab.
+The paper masks a message element in GT directly; the browser exhibit instead hashes the recovered GT
+element to a fixed 32-byte XOR mask so it can reuse the lab's byte visual language. That adaptation is
+for teaching and does **not** claim the paper's full security proof. The learner exercise is bounded to
+depth 3; the core supports a small configured bound for tests.
 
 ## Related Demos
 
