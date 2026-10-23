@@ -71,22 +71,25 @@ describe('asymmetric HIBE delegation core', () => {
     expect(Array.from(await decryptHIBE(ct, fresh, sys.params))).toEqual(Array.from(M));
   });
 
-  it('a parent key is not a child decryption key', async () => {
+  it('a parent key is structurally too shallow to decrypt a child ciphertext until it delegates', async () => {
     const sys = setupHIBE(3, 32);
     const org = keyGenHIBE(['org'], sys.masterKey, sys.params);
     const ct = await encryptHIBE(msg32(), ['org', 'finance'], sys.params);
-    await expect(decryptHIBE(ct, org, sys.params)).rejects.toThrow(/does not match/);
+    await expect(decryptHIBE(ct, org, sys.params)).rejects.toThrow(/depth mismatch/);
   });
 
-  it('a sibling key cannot decrypt another branch', async () => {
+  it('a same-depth sibling key runs the pairing math but recovers the wrong secret and plaintext', async () => {
     const sys = setupHIBE(3, 32);
     const org = keyGenHIBE(['org'], sys.masterKey, sys.params);
     const finance = delegateHIBE(org, 'finance', sys.params);
     const hr = delegateHIBE(org, 'hr', sys.params);
-    const ct = await encryptHIBE(msg32(), ['org', 'finance'], sys.params);
+    const M = msg32(66);
+    const ct = await encryptHIBE(M, ['org', 'finance'], sys.params);
 
     expect(finance.identity).not.toEqual(hr.identity);
-    await expect(decryptHIBE(ct, hr, sys.params)).rejects.toThrow(/does not match/);
+    const wrongShared = recoverHIBESecret(ct, hr);
+    expect(gtEquals(wrongShared, ct._demoShared)).toBe(false);
+    expect(Array.from(await decryptHIBE(ct, hr, sys.params))).not.toEqual(Array.from(M));
   });
 
   it('compromising a delegated node exposes its descendant delegation path but not siblings', () => {
