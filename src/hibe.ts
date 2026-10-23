@@ -375,9 +375,6 @@ export async function encryptHIBE(
   };
 }
 
-function sameIdentity(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((x, i) => x === b[i]);
-}
 
 /**
  * Recover the HIBE encapsulated GT element from the private key/ciphertext.
@@ -386,9 +383,10 @@ export function recoverHIBESecret(
   ciphertext: HIBECiphertext,
   key: HIBEPrivateKey,
 ): GTElement {
-  if (!sameIdentity(ciphertext.identity, key.identity)) {
-    throw new Error('HIBE key identity does not match ciphertext identity');
-  }
+  // Identity equality is deliberately NOT checked here. A same-depth wrong key
+  // must run the actual pairing algebra and recover the wrong GT element; that
+  // is what demonstrates cryptographic branch separation. Only a structural
+  // depth mismatch is rejected before the math.
   if (ciphertext.E.length !== key.K3.length) {
     throw new Error('HIBE ciphertext/key depth mismatch');
   }
