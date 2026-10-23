@@ -95,6 +95,15 @@ function setHTML(id: string, html: string) {
   if (el) el.innerHTML = html;
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
 function getVal(id: string): string {
   const el = document.getElementById(id) as HTMLInputElement | null;
   return el ? el.value.trim() : '';
@@ -1379,35 +1388,44 @@ function wireExhibit6(): void {
       const siblingPlainDiffers = Array.from(siblingPlain).some((b, i) => b !== message[i]);
       const subtree = isIdentityPrefix([root, dept], target);
       const siblingIsOutside = !isIdentityPrefix([root, dept], [root, siblingName, user]);
+      const shown = {
+        root: escapeHtml(root),
+        dept: escapeHtml(dept),
+        user: escapeHtml(user),
+        sibling: escapeHtml(siblingName),
+        target: target.map(escapeHtml).join(' / '),
+        delegatedPlain: escapeHtml(unpad(delegatedPlain)),
+        freshPlain: escapeHtml(unpad(freshPlain)),
+      };
 
       setHTML('term-hibe', `
 <span class="lbl-cyan">TYPE-3 HIBE — EXECUTABLE DELEGATION</span>
 <span class="lbl-dim">───────────────────────────────────────────────</span>
 
 PKG fresh extraction:
-  root key = [${root}]
+  root key = [${shown.root}]
   master secret used here: <span class="lbl-gold">YES</span>
 
 Parent delegation — no master-secret input:
-  [${root}] → [${root} / ${dept}]
-  [${root} / ${dept}] → [${target.join(' / ')}]
+  [${shown.root}] → [${shown.root} / ${shown.dept}]
+  [${shown.root} / ${shown.dept}] → [${shown.target}]
   department key covers target subtree: <span class="${subtree ? 'lbl-green' : 'lbl-red'}">${subtree ? 'YES' : 'NO'}</span>
 
 Ciphertext target:
-  [${target.join(' / ')}]
+  [${shown.target}]
 
 Delegated descendant decrypt:
-  recovered = "${unpad(delegatedPlain)}"
+  recovered = "${shown.delegatedPlain}"
   sender/recipient G_T secret match: <span class="${gtEquals(delegatedShared, ct._demoShared) ? 'lbl-green' : 'lbl-red'}">${gtEquals(delegatedShared, ct._demoShared) ? 'YES' : 'NO'}</span>
   verdict: <span class="${delegatedOk ? 'lbl-green' : 'lbl-red'}">${delegatedOk ? '✓ DESCENDANT KEY DECRYPTS' : '✗ FAILED'}</span>
 
 Fresh PKG key for the same target:
-  recovered = "${unpad(freshPlain)}"
+  recovered = "${shown.freshPlain}"
   verdict: <span class="${freshOk ? 'lbl-green' : 'lbl-red'}">${freshOk ? '✓ PKG ESCROW STILL REACHES THIS BRANCH' : '✗ FAILED'}</span>
 
 Sibling compromise:
-  wrong branch = [${root} / ${siblingName} / ${user}]
-  outside [${root} / ${dept}] subtree: <span class="${siblingIsOutside ? 'lbl-green' : 'lbl-red'}">${siblingIsOutside ? 'YES' : 'NO'}</span>
+  wrong branch = [${shown.root} / ${shown.sibling} / ${shown.user}]
+  outside [${shown.root} / ${shown.dept}] subtree: <span class="${siblingIsOutside ? 'lbl-green' : 'lbl-red'}">${siblingIsOutside ? 'YES' : 'NO'}</span>
   pairing math executed at the same depth
   recovered G_T secret equals sender's: <span class="${siblingSecretDiffers ? 'lbl-red' : 'lbl-green'}">${siblingSecretDiffers ? 'NO' : 'YES'}</span>
   plaintext equals target plaintext: <span class="${siblingPlainDiffers ? 'lbl-red' : 'lbl-green'}">${siblingPlainDiffers ? 'NO' : 'YES'}</span>
@@ -1416,8 +1434,8 @@ Sibling compromise:
 <span class="lbl-amber">What hierarchy changes:</span>
   The root PKG no longer has to issue every descendant key itself.
   A delegated node can create keys only below its own identity prefix.
-  Compromising [${root} / ${dept}] exposes that subtree's future delegations,
-  but not the sibling [${root} / ${siblingName}] branch.
+  Compromising [${shown.root} / ${shown.dept}] exposes that subtree's future delegations,
+  but not the sibling [${shown.root} / ${shown.sibling}] branch.
   The root PKG still retains escrow over every branch.
 ${truncNote(msg, MSG_BYTES)}
       `.trim());
