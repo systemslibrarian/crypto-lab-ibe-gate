@@ -80,7 +80,7 @@ npm run dev
 ## Run the Tests
 
 ```bash
-npm test        # 31 Vitest crypto unit tests (BasicIdent + Type-3 HIBE over BLS12-381)
+npm test        # 35 Vitest tests total (31 pairing/IBE/HIBE + 4 palette tests)
 npm run build       # tsc + production bundle (the browser gate runs against this)
 npm run test:a11y   # Playwright: functional gate + axe-core WCAG A/AA, both themes
 ```
