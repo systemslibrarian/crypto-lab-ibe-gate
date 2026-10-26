@@ -118,4 +118,3 @@ try {
 } finally {
   restore();
 }
-
