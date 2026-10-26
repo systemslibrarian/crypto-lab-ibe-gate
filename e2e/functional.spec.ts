@@ -564,3 +564,91 @@ test('HIBE exhibit executes descendant delegation and a cryptographic sibling fa
   // computation, not from refusing to run because the labels differ.
   expect(out).toContain('pairing math executed at the same depth');
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Exhibit 7 — executable PKI / IBE / certificateless comparison
+// ─────────────────────────────────────────────────────────────────────────────
+
+test('CLE exhibit keeps Type-I and Type-II capabilities separate and requires both contributions', async ({ page }) => {
+  await boot(page);
+  await page.locator('#tab-cle').click();
+  await page.locator('#cle-identity').fill('auditor@example.edu');
+  await page.locator('#cle-message').fill('review copy');
+  await page.locator('#btn-cle-run').click();
+  await expect(page.locator('#btn-cle-run')).toBeEnabled({ timeout: 120_000 });
+
+  for (const id of [
+    'cle-pki-cert',
+    'cle-pki-honest',
+    'cle-pki-future',
+    'cle-pki-recorded',
+    'cle-ibe-kgc',
+    'cle-honest',
+    'cle-type-i',
+    'cle-type-ii',
+    'cle-combined',
+    'cle-displaced',
+    'cle-tamper',
+  ]) {
+    await expect(page.locator(`#${id}`), `${id} should match the live computation`).toHaveAttribute(
+      'data-verdict',
+      'pass'
+    );
+  }
+
+  await expect(page.locator('#cle-type-i')).toHaveText('REJECT');
+  await expect(page.locator('#cle-type-ii')).toHaveText('REJECT');
+  await expect(page.locator('#cle-combined')).toHaveText('ACCEPT');
+  await expect(page.locator('#cle-pki-recorded')).toHaveText('NO');
+
+  const out = await term(page, 'term-cle');
+  expect(out).toContain('c1 serialized before RSA-OAEP = 189 bytes');
+  expect(out).toContain('c2 RSA-OAEP ciphertext = 256 bytes');
+  expect(out).toContain('HMAC-SHA-256 tag = 32 bytes');
+  expect(out).toContain('attacker-visible result for either failed attempt = REJECT only');
+  expect(out).toContain('Type II internal stop = outer-pke');
+  expect(out).toContain('do not upgrade BasicIdent to CCA security');
+});
+
+test('CLE rerun produces a fresh envelope and over-bound UTF-8 input is refused visibly', async ({ page }) => {
+  await boot(page);
+  await page.locator('#tab-cle').click();
+  await page.locator('#cle-message').fill('freshness check');
+  await page.locator('#btn-cle-run').click();
+  await expect(page.locator('#btn-cle-run')).toBeEnabled({ timeout: 120_000 });
+  const first = /c2 RSA-OAEP ciphertext = 256 bytes; fingerprint ([0-9a-f]+)/.exec(
+    await term(page, 'term-cle')
+  );
+  expect(first).toBeTruthy();
+
+  await page.locator('#btn-cle-run').click();
+  await expect(page.locator('#btn-cle-run')).toBeEnabled({ timeout: 120_000 });
+  const second = /c2 RSA-OAEP ciphertext = 256 bytes; fingerprint ([0-9a-f]+)/.exec(
+    await term(page, 'term-cle')
+  );
+  expect(second).toBeTruthy();
+  expect(second![1]).not.toBe(first![1]);
+
+  await page.locator('#cle-message').fill('🙂🙂🙂🙂🙂🙂'); // 24 UTF-8 bytes, not 6
+  await page.locator('#btn-cle-run').click();
+  await expect(page.locator('#btn-cle-run')).toBeEnabled();
+  const refused = await term(page, 'term-cle');
+  expect(refused).toContain('Message is 24 UTF-8 bytes');
+  expect(refused).toContain('permits 23');
+  expect(refused).not.toContain('THREE KEY-OWNERSHIP ROUTES');
+});
+
+test('CLE scope and primary sources stay explicit in the learner page', async ({ page }) => {
+  await boot(page);
+  await page.locator('#tab-cle').click();
+  const panel = page.locator('#panel-cle');
+  await expect(panel).toContainText('bounded mechanics adaptation');
+  await expect(panel).toContainText('BasicIdent, which is only IND-CPA');
+  await expect(panel).toContainText('the theorem does not apply');
+  await expect(panel).toContainText('not constant-time');
+  await expect(panel).toContainText('one-shot teaching cases, not full adaptive security games');
+  await expect(panel).toContainText('Does not receive the target partial private key');
+  await expect(panel).toContainText('Does not receive or replace the target user');
+  await expect(panel.locator('a[href="https://eprint.iacr.org/2007/095"]')).toHaveCount(1);
+  await expect(panel.locator('a[href="https://eprint.iacr.org/2003/126"]')).toHaveCount(1);
+});

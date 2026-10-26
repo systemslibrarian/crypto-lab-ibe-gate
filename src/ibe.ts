@@ -152,7 +152,7 @@ export async function encrypt(
  *   M = V ⊕ H₂(e(d_ID, U))
  */
 export async function decrypt(
-  ciphertext: IBECiphertext,
+  ciphertext: Pick<IBECiphertext, 'U' | 'V'>,
   privateKey: G1Point,
   params: IBESystemParams
 ): Promise<Uint8Array> {

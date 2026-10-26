@@ -18,17 +18,17 @@ export const NARROW = { width: 380, height: 800 };
  *
  *  2. EVERY SCAN ASSERTS ITS CONTENT IS PRESENT FIRST, and there are scans well
  *     past first paint. axe over an empty container passes having checked
- *     nothing. At first paint every one of this lab's five exhibits reads
- *     "Waiting…" or "Run Setup first": no system parameters, no ciphertext, no
- *     576-byte G_T inspector, no XOR byte grid, no escrow transcript. The
- *     headline claim — the PKG silently reading a message it was never sent —
- *     is five interactions deep, in a tab that does not exist until Exhibit 1
- *     has run.
+ *     nothing. At first paint the active Setup panel reads "Waiting…", the four
+ *     BasicIdent-dependent panels read "Run Setup first", and the independent
+ *     HIBE/CLE panels are ready but have no result: no system parameters, no
+ *     ciphertext, no 576-byte G_T inspector, no XOR byte grid, and no escrow or
+ *     adversary transcript. The headline escrow claim is five interactions
+ *     deep even though its tab, correctly, exists from first paint.
  *
  *  3. ONLY ONE PANEL IS OPEN AT A TIME, AND THAT IS THE POINT. The gate this
  *     replaces called `revealAll()`, which added `.active` to every `.panel` and
  *     stripped their `aria-hidden`, then scanned once. That is not a state the
- *     lab can be in: five tabpanels were simultaneously visible while
+ *     lab can be in: every tabpanel was simultaneously visible while
  *     `aria-selected="true"` named one tab, so the scan certified a document no
  *     visitor ever loads and no state a visitor *does* load. Panels are switched
  *     here, never forced.
@@ -119,7 +119,7 @@ export async function boot(page: Page, theme: 'dark' | 'light'): Promise<void> {
   // re-highlights.
   await expect(page.locator('#btn-setup')).toBeVisible();
   await expect(page.locator('#flow-svg')).toBeVisible();
-  await expect(page.locator('.tab-btn')).toHaveCount(6);
+  await expect(page.locator('.tab-btn')).toHaveCount(7);
   // …and that the exhibits really are empty here, so a scan of this state is
   // measuring the shell rather than silently measuring nothing.
   await expect(page.locator('#term-setup')).toHaveText('Waiting to run setup…');
@@ -339,13 +339,14 @@ async function openTab(page: Page, tab: string): Promise<void> {
  *
  * Three things shape this drive:
  *
- *  - THE PREREQUISITE STATE IS A REAL STATE. Four of the five exhibits ship
+ *  - THE PREREQUISITE STATE IS A REAL STATE. Four of the seven exhibits ship
  *    their run button `disabled` and their output reading "Run Setup first
  *    (Exhibit 1)" until the ceremony has run. That is what a visitor sees on
  *    arrival, it is styled differently from every other state (`.btn:disabled`
  *    drops to `opacity: .4`), and the gate this replaces never scanned it — it
- *    ran the whole protocol before its single scan. So every tab is visited
- *    once locked, then again once unlocked.
+ *    ran the whole protocol before its single scan. Those four tabs are each
+ *    visited once locked, then again once unlocked; independent HIBE and CLE
+ *    are driven from their genuine ready states later.
  *
  *  - THE POLICY FORK IS THE LESSON OF EXHIBIT 4, so all three branches run.
  *    `issue`, `refuse` and `collude` render visibly different transcripts, and
@@ -446,4 +447,14 @@ export async function driveAllStates(page: Page, theme: string): Promise<void> {
   await expect(page.locator('#term-hibe')).toContainText('DESCENDANT KEY DECRYPTS', { timeout: 120_000 });
   await expect(page.locator('#term-hibe')).toContainText('SIBLING BRANCH CANNOT OPEN IT');
   await scan(page, `${theme} / HIBE parent delegation and sibling branch boundary`);
+
+  // ── Exhibit 7: PKI / IBE / certificateless ownership split ──────────────
+  await openTab(page, 'cle');
+  await scan(page, `${theme} / CLE comparison ready`);
+  await page.locator('#btn-cle-run').click();
+  await expect(page.locator('#btn-cle-run')).toBeEnabled({ timeout: 120_000 });
+  await expect(page.locator('#term-cle')).toContainText('combined compromise', { timeout: 120_000 });
+  await expect(page.locator('#cle-type-i')).toHaveAttribute('data-verdict', 'pass');
+  await expect(page.locator('#cle-type-ii')).toHaveAttribute('data-verdict', 'pass');
+  await scan(page, `${theme} / PKI IBE and CLE adversary comparison`);
 }
