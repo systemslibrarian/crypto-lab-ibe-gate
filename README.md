@@ -17,6 +17,19 @@ key delegates a user key without receiving the master secret, and a same-depth s
 to run the pairing algebra and demonstrably recovers the wrong GT secret. This is a separate HIBE
 construction; slash-separated Boneh-Franklin identities are not presented as delegation.
 
+A seventh exhibit makes the PKI / IBE / certificateless ownership split executable. Its PKI route
+verifies a real WebCrypto P-256 CA signature over a length-framed identity, context, and RSA public
+key before encrypting. Its IBE route shows that the KGC master secret alone can derive the recipient
+key. Its certificateless route follows the envelope mechanics in Huang and Wong, ePrint 2007/095
+§4.2: `c1 = IBE.Enc(ID, m || mk)`, `c2 = PKE.Enc(upk, c1)`, and
+`tag = MAC_mk(c2)`. Separate Type-I (public-key replacement, no target partial key) and Type-II
+(KGC/target partial key, no target user secret or replacement) attempts fail, while an explicit
+combined-compromise control decrypts. The route uses the existing real BasicIdent/BLS12-381 code,
+WebCrypto RSA-OAEP-2048/SHA-256, and HMAC-SHA-256; it is not a hardcoded scenario.
+The actor runs are bounded one-shot cases rather than full adaptive games: Type I uses a public
+group-element guess for the absent target partial key, Type II creates an unrelated RSA key internally,
+and no extraction or decryption oracle is simulated.
+
 **One deliberate deviation from the paper.** Boneh-Franklin define BasicIdent over a *symmetric*
 admissible bilinear map `ê: G1 × G1 → G2` — Q_ID, P, P_pub and the ciphertext component rP all
 live in the same group, and the security reduction is to BDH in ⟨G1, G2, ê⟩. BLS12-381 has no
@@ -41,6 +54,7 @@ fingerprint.
 - Teaching bilinear pairings through a complete protocol (setup to decrypt, not just pairing primitives)
 - Evaluating IBE for enterprise email encryption, regulated industries, or policy-encoded access control
 - Comparing IBE's centralized trust model to PKI, Signal Protocol, and threshold schemes
+- Comparing PKI, IBE, and certificateless key ownership with separate Type-I and Type-II adversaries
 - **Not for:** applications requiring key escrow resistance (use PKI or end-to-end schemes with forward secrecy); the PKG is a single point of compromise in BasicIdent
 - Do NOT use this in production — it is a from-the-paper teaching implementation (pure-TypeScript pairings, BasicIdent/IND-CPA only), not a hardened IBE library.
 
@@ -56,10 +70,20 @@ compares that successful path with a sibling branch that executes the same-depth
 lands on the wrong GT secret. It also freshly extracts the target key at the PKG to show that hierarchy
 reduces routine root issuance without removing root escrow.
 
+The PKI/IBE/CLE tab generates fresh CA, KGC, user, and attacker keys on every run. It verifies an
+honest PKI route, demonstrates what a compromised CA can redirect (a future send, not a recorded
+honest-key ciphertext), executes the KGC's IBE escrow path, and then runs the two certificateless
+adversary classes with APIs that omit the capability each class is forbidden to receive. The learner
+sees a single explicit reject result from either failed attacker attempt; an explicitly labelled
+omniscient teaching trace separately names the internal stop. This removes a named-stage response,
+not timing leakage: the browser teaching code is not constant-time and claims no timing defense.
+
 ## What Can Go Wrong
 
 - **The PKG can decrypt every message.** Master secret `s` lets PKG derive any identity's private key. This is architectural, not a bug. The HIBE exhibit reduces how often the root must issue descendant keys, but the root PKG can still freshly extract every branch; HIBE delegation does not remove root escrow.
 - BasicIdent is IND-CPA but not IND-CCA. An active attacker can modify ciphertexts. Production systems use FullIdent (Boneh-Franklin 2001 Section 4.2) with a Fujisaki-Okamoto transform for IND-CCA security.
+- **The certificateless exhibit is a mechanics adaptation, not Huang–Wong's security theorem.** Their generic result assumes an IND-ID-CCA2 IBE, IND-CCA2 PKE, and strong one-time MAC. This lab deliberately reuses IND-CPA BasicIdent, so the composition does not satisfy the theorem's premises and no CLE security proof is claimed. The 23-byte message bound comes from fitting a canonical 189-byte inner ciphertext beneath RSA-OAEP-2048/SHA-256's 190-byte input ceiling.
+- Certificateless encryption does not authenticate a public-key directory by itself. A Type-I replacement remains an availability attack against the honest user, and combining the target partial key with the replacement/user secret decrypts.
 - Private keys must be transmitted securely from PKG to user. This requires out-of-band authentication — the PKG has to know the user is who they claim to be before issuing `d_ID`.
 - Revocation is hard. Unlike PKI where certificates can be revoked, an issued IBE private key is valid forever for that identity. Workarounds use short-lived identities (email || timestamp) or include revocation lists.
 - BLS12-381 pairings are computationally expensive. Measured here (Node 24, `@noble/curves` 2.2, Apple silicon): a warm single pairing is around 15 ms, and a cold first call — JIT warm-up included — is closer to 70 ms; a browser is in the same order of magnitude, not the same number. Every exhibit therefore runs one to two pairings per click, which is why they feel instant but not free. Production deployments use C/Rust/assembly with optimized pairing libraries.
@@ -80,9 +104,9 @@ npm run dev
 ## Run the Tests
 
 ```bash
-npm test        # 35 Vitest tests total (31 pairing/IBE/HIBE + 4 palette tests)
+npm test            # 50 Vitest tests (IBE, HIBE, CLE/PKI, and palette)
 npm run build       # tsc + production bundle (the browser gate runs against this)
-npm run test:a11y   # Playwright: functional gate + axe-core WCAG A/AA, both themes
+npm run test:a11y   # Playwright: 18 functional + 2 full-state WCAG/reflow drives
 ```
 
 `npm run test:a11y` runs the whole `e2e/` directory, which is two gates:
@@ -101,7 +125,10 @@ npm run test:a11y   # Playwright: functional gate + axe-core WCAG A/AA, both the
   PKG — each asserted to reach its failure state *and* to say why. The HIBE claim test additionally
   drives a custom three-level identity, requires descendant decryption, and checks that the sibling
   branch reports a different recovered GT secret and plaintext after the pairing math actually runs.
-- **`e2e/a11y.spec.ts`** — axe-core WCAG 2.1 A/AA over every exhibit, both themes.
+  The CLE claim tests require every positive and negative live verdict to match its expected outcome,
+  check the actual RSA/HMAC sizes, rerun for fresh ciphertext, and exercise the UTF-8 bound.
+- **`e2e/a11y.spec.ts`** — axe-core WCAG 2.1 A/AA, arithmetic text contrast, non-text contrast
+  ratchets, keyboard-reachable scrollers, and reflow checks over every state at desktop and 380 px.
 
 The unit suite (`test/ibe.test.ts`) runs against the real `@noble/curves`
 pairing — no mocks — and covers:
@@ -118,6 +145,12 @@ recursive delegation without the master secret, fresh/delegated correctness for 
 structural rejection of a too-shallow parent key, same-depth sibling failure through the actual pairing
 algebra, maximum-depth enforcement, and retained root-PKG escrow.
 
+The certificateless/PKI suite (`test/certificateless.test.ts`) checks the 189-byte canonical inner
+encoding and 256-byte RSA ciphertext, honest two-contribution recovery, fresh envelopes, UTF-8 bounds,
+identity/context binding, tag and outer-ciphertext tampering, uniform public rejection, distinct Type-I
+and Type-II capability sets, the combined-compromise control, real P-256 certificate verification, and
+the difference between future CA redirection and decryption of a recorded ciphertext.
+
 ### HIBE construction and limits
 
 The HIBE core follows Appendix G of Ramanna, Chatterjee & Sarkar, *Variants of Waters' Dual-System
@@ -128,6 +161,20 @@ The paper masks a message element in GT directly; the browser exhibit instead ha
 element to a fixed 32-byte XOR mask so it can reuse the lab's byte visual language. That adaptation is
 for teaching and does **not** claim the paper's full security proof. The learner exercise is bounded to
 depth 3; the core supports a small configured bound for tests.
+
+### Certificateless construction and limits
+
+The seventh exhibit is based on Qiong Huang and Duncan S. Wong, *Generic Certificateless Encryption
+in the Standard Model*, [ePrint 2007/095](https://eprint.iacr.org/2007/095), especially §§2, 3, 4,
+and 4.2. Its adversary split follows Sattam S. Al-Riyami and Kenneth G. Paterson,
+*Certificateless Public Key Cryptography*, [ePrint 2003/126](https://eprint.iacr.org/2003/126).
+The implementation preserves Huang–Wong's order: recover `c1` with the user secret, recover `m || mk`
+with the partial key, then verify `MAC_mk(c2)`. Because authentication cannot precede those decryptions,
+named internal failure stages are restricted to the omniscient classroom view and never returned by
+the attacker-facing API. That result-shape boundary is not a constant-time claim. Context and identity
+are additionally length-framed and committed inside the
+canonical teaching encoding. This is a defensive binding adaptation; it does not repair the missing
+IND-ID-CCA2 premise or turn the composition into a standardized CLE format.
 
 ## Related Demos
 

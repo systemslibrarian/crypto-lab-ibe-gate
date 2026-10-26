@@ -4,14 +4,13 @@ import { boot, driveAllStates, expectBaselineNotStale, NARROW } from './gate';
 /**
  * WCAG A/AA regression gate.
  *
- * All five exhibits are driven in the order the lab enforces: every downstream
- * tab is scanned first in its locked "Run Setup first" state, then bilinearity
- * and the setup ceremony are run, a message is encrypted to an identity that
- * has never enrolled, the recipient enrols and decrypts, all 576 bytes of the
- * shared G_T element are inspected, the wrong key is tried against the same
- * ciphertext, all three PKG issuance policies are run, and finally the PKG
- * decrypts a message it was never sent. Every resulting state is scanned in
- * both themes at desktop and phone width.
+ * All seven exhibits are driven in the order the lab enforces: the four
+ * BasicIdent-dependent tabs are first scanned in their locked state, then
+ * bilinearity and Setup run, a never-enrolled identity receives and decrypts a
+ * ciphertext, all 576 shared-G_T bytes are inspected, the wrong key runs, all
+ * three issuance policies run, and the PKG escrow, independent HIBE, and
+ * PKI/IBE/CLE comparison paths run. Every resulting state is scanned in the
+ * lab's single dark theme at desktop and phone width.
  *
  * See `gate.ts` for why nothing is injected into the page, why no panel is ever
  * force-revealed, why each scan asserts its content first, and why `violations`

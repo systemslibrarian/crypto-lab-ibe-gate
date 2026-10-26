@@ -23,6 +23,22 @@ import {
 import { hashToG1, gtToBytes, hashGTtoBytes, pairing, gtEquals } from './pairing.ts';
 import { demonstrateKeyEscrow } from './scenarios.ts';
 import { byteColor } from './palette.ts';
+import {
+  CLE_CONTEXT,
+  CLE_MESSAGE_MAX_BYTES,
+  decryptCLE,
+  decryptCLETeaching,
+  decryptPKI,
+  encryptCLE,
+  encryptPKI,
+  generateCertificateAuthority,
+  generateUserKeyPair,
+  issueCertificate,
+  issuePartialPrivateKey,
+  setupCLE,
+  typeIAttempt,
+  typeIIAttempt,
+} from './certificateless.ts';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -442,6 +458,7 @@ function renderApp() {
       <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-timelimit" id="tab-timelimit" data-tab="timelimit">4 · Time-Limited</button>
       <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-escrow"    id="tab-escrow"    data-tab="escrow">5 · PKG Escrow Tradeoff</button>
       <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-hibe"      id="tab-hibe"      data-tab="hibe">6 · HIBE Delegation</button>
+      <button class="tab-btn" role="tab" aria-selected="false" aria-controls="panel-cle"       id="tab-cle"       data-tab="cle">7 · PKI, IBE, or CLE?</button>
     </nav>
 
     <main id="main-content">
@@ -451,6 +468,7 @@ function renderApp() {
       ${exhibit4()}
       ${exhibit5()}
       ${exhibit6()}
+      ${exhibit7()}
     </main>
 <footer style="margin-top:3rem;padding:2rem 1rem;border-top:1px solid rgba(128,128,128,.25);text-align:center;font-size:.85rem;line-height:1.9;font-family:ui-monospace,Menlo,Consolas,monospace">
   <div><strong>Related demos:</strong> <a href="https://systemslibrarian.github.io/crypto-lab-pairing-gate/" style="color:var(--cyan)">pairing-gate</a> &middot; <a href="https://systemslibrarian.github.io/crypto-lab-iron-letter/" style="color:var(--cyan)">iron-letter</a> &middot; <a href="https://systemslibrarian.github.io/crypto-lab-pki-chain/" style="color:var(--cyan)">pki-chain</a> &middot; <a href="https://systemslibrarian.github.io/crypto-lab-envelope-kms/" style="color:var(--cyan)">envelope-kms</a></div>
@@ -485,6 +503,7 @@ function renderApp() {
   wireExhibit4();
   wireExhibit5();
   wireExhibit6();
+  wireExhibit7();
 }
 
 // ─── Exhibit 1: Setup Ceremony ────────────────────────────────────────────────
@@ -1441,6 +1460,283 @@ ${truncNote(msg, MSG_BYTES)}
       `.trim());
     } catch (e) {
       setHTML('term-hibe', `<span class="lbl-red">ERROR: ${e}</span>`);
+    } finally {
+      btn.disabled = false;
+      btn.setAttribute('aria-disabled', 'false');
+    }
+  });
+}
+
+// ─── Exhibit 7: PKI / IBE / certificateless ownership split ─────────────────
+
+function exhibit7(): string {
+  return `
+  <div class="panel" id="panel-cle" role="tabpanel" aria-labelledby="tab-cle" aria-hidden="true">
+    <div class="card">
+      <h2>Exhibit 7 — Who Must Be Compromised?</h2>
+      <p style="color:var(--text-dim);margin-bottom:14px;font-size:13px;">
+        Run three real routes to the same identity. PKI verifies a P-256 CA signature before using
+        the certified RSA key. IBE uses BasicIdent, so the KGC can extract the whole recipient key.
+        The certificateless route splits authority between an IBE partial key and a user-generated
+        RSA secret, then runs Huang–Wong's <code>IBE → PKE → one-time MAC</code> envelope mechanics.
+      </p>
+      <div class="field-row">
+        <label for="cle-identity">Target identity</label>
+        <input id="cle-identity" value="student@example.edu" autocomplete="off" />
+      </div>
+      <div class="field-row">
+        <label for="cle-message">Message (at most ${CLE_MESSAGE_MAX_BYTES} UTF-8 bytes)</label>
+        <input id="cle-message" value="capstone draft" autocomplete="off" />
+      </div>
+      <button class="btn btn-primary" id="btn-cle-run">Run all three routes and adversaries</button>
+      <div class="term" id="term-cle" role="log" aria-live="polite" aria-label="PKI IBE and certificateless comparison output">Ready to generate fresh CA, KGC, user, and attacker keys.</div>
+    </div>
+
+    <div class="card">
+      <h2>The two certificateless adversaries are not interchangeable</h2>
+      <div class="term" style="font-size:11px;white-space:pre-wrap">
+<span class="lbl-cyan">Type I — public-key replacement</span>
+May replace the target user's public key and knows its own replacement secret.
+Does <strong>not</strong> receive the target partial private key or KGC master secret.
+
+<span class="lbl-gold">Type II — malicious-but-passive KGC</span>
+Knows the master secret and therefore the target partial private key.
+Does <strong>not</strong> receive or replace the target user's independently generated secret key.
+
+Giving one actor both capabilities is the explicit compromise control — it decrypts.
+Key replacement can still deny service, and CLE does not authenticate a directory by itself.
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Exact model boundary</h2>
+      <p style="color:var(--text-dim);font-size:12px;line-height:1.65;">
+        This is a <strong>bounded mechanics adaptation</strong>, not a proof or production CLE scheme.
+        Huang and Wong's 2007 generic theorem assumes an IND-ID-CCA2 IBE, IND-CCA2 public-key
+        encryption, and a strong one-time MAC. This lab deliberately reuses Boneh–Franklin
+        <strong>BasicIdent, which is only IND-CPA</strong>; therefore the theorem does not apply to
+        this composition. RSA-OAEP-2048/SHA-256 and HMAC-SHA-256 are real WebCrypto operations,
+        and the inner BasicIdent operation uses the lab's real BLS12-381 pairing code. The
+        omniscient class trace names an internal failure stage, but the attacker API receives
+        only one explicit reject bit, rather than a named failure-stage oracle. This teaching
+        code is not constant-time and makes no timing-side-channel claim.
+        The two actor runs are one-shot teaching cases, not full adaptive security games:
+        Type I uses an explicit public group-element guess for the missing partial key, while
+        Type II generates an unrelated RSA key internally. No extraction or decryption oracle
+        is simulated.
+      </p>
+      <p style="color:var(--text-dim);font-size:12px;line-height:1.65;margin-top:10px;">
+        Primary sources:
+        <a href="https://eprint.iacr.org/2007/095" target="_blank" rel="noreferrer">Huang–Wong, §4 and §4.2</a>
+        for the generic construction and
+        <a href="https://eprint.iacr.org/2003/126" target="_blank" rel="noreferrer">Al-Riyami–Paterson</a>
+        for the Type-I/Type-II certificateless model.
+      </p>
+    </div>
+  </div>`;
+}
+
+function boolVerdict(ok: boolean, yes: string, no: string, id: string): string {
+  return `<span id="${id}" data-verdict="${ok ? 'pass' : 'fail'}" class="${ok ? 'lbl-green' : 'lbl-red'}">${ok ? yes : no}</span>`;
+}
+
+function sameBytes(a: Uint8Array | null, b: Uint8Array): boolean {
+  return !!a && a.length === b.length && a.every((value, i) => value === b[i]);
+}
+
+function wireExhibit7(): void {
+  document.getElementById('btn-cle-run')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-cle-run') as HTMLButtonElement;
+    const identity = getVal('cle-identity');
+    const message = getVal('cle-message');
+    if (!identity || !message) {
+      setHTML('term-cle', '<span class="lbl-red">Enter a target identity and message.</span>');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.setAttribute('aria-disabled', 'true');
+    loading('term-cle');
+
+    try {
+      const encodedMessage = new TextEncoder().encode(message);
+      if (encodedMessage.length > CLE_MESSAGE_MAX_BYTES) {
+        throw new Error(`Message is ${encodedMessage.length} UTF-8 bytes; the bounded envelope permits ${CLE_MESSAGE_MAX_BYTES}.`);
+      }
+
+      const system = setupCLE();
+      const [user, attacker, ca] = await Promise.all([
+        generateUserKeyPair(),
+        generateUserKeyPair(),
+        generateCertificateAuthority(),
+      ]);
+      const targetPartial = issuePartialPrivateKey(identity, CLE_CONTEXT, system);
+      const otherPartial = issuePartialPrivateKey(`not-${identity}`, CLE_CONTEXT, system);
+
+      // PKI: a real CA signature authenticates the identity -> RSA-key binding.
+      const certificate = await issueCertificate(
+        identity,
+        CLE_CONTEXT,
+        user.publicKey,
+        ca.privateKey
+      );
+      const pkiCiphertext = await encryptPKI(
+        encodedMessage,
+        identity,
+        CLE_CONTEXT,
+        certificate,
+        ca.publicKey
+      );
+      const pkiPlain = await decryptPKI(pkiCiphertext.ciphertext, user.privateKey);
+      const pkiHonest = sameBytes(pkiPlain, encodedMessage);
+      const oldCipherForAttacker = await decryptPKI(pkiCiphertext.ciphertext, attacker.privateKey);
+      const forgedCertificate = await issueCertificate(
+        identity,
+        CLE_CONTEXT,
+        attacker.publicKey,
+        ca.privateKey
+      );
+      const futurePki = await encryptPKI(
+        encodedMessage,
+        identity,
+        CLE_CONTEXT,
+        forgedCertificate,
+        ca.publicKey
+      );
+      const futureForAttacker = await decryptPKI(futurePki.ciphertext, attacker.privateKey);
+      const caRedirectsFuture = sameBytes(futureForAttacker, encodedMessage);
+      const caReadsRecorded = sameBytes(oldCipherForAttacker, encodedMessage);
+
+      // IBE: the KGC master is sufficient because it can extract the target key.
+      const directIbe = ibeSetup(MSG_BYTES);
+      const directMessage = pad(message, MSG_BYTES);
+      const directCiphertext = await encrypt(directMessage, identity, directIbe.params);
+      const kgcTargetKey = extract(identity, directIbe.masterKey);
+      const kgcPlain = await decrypt(directCiphertext, kgcTargetKey, directIbe.params);
+      const kgcReadsIbe = sameBytes(kgcPlain, directMessage);
+
+      // CLE honest route, then each adversary with only its permitted inputs.
+      const honest = await encryptCLE(
+        message,
+        identity,
+        CLE_CONTEXT,
+        system.params,
+        user.publicKey
+      );
+      const honestResult = await decryptCLE(
+        honest,
+        identity,
+        CLE_CONTEXT,
+        system.params,
+        targetPartial,
+        user.privateKey
+      );
+      const replacementEnvelope = await encryptCLE(
+        message,
+        identity,
+        CLE_CONTEXT,
+        system.params,
+        attacker.publicKey
+      );
+      const typeI = await typeIAttempt(
+        replacementEnvelope,
+        identity,
+        CLE_CONTEXT,
+        system.params,
+        attacker.privateKey
+      );
+      const typeII = await typeIIAttempt(
+        honest,
+        identity,
+        CLE_CONTEXT,
+        system.params,
+        targetPartial
+      );
+      const combined = await decryptCLE(
+        replacementEnvelope,
+        identity,
+        CLE_CONTEXT,
+        system.params,
+        targetPartial,
+        attacker.privateKey
+      );
+      const displacedUser = await decryptCLE(
+        replacementEnvelope,
+        identity,
+        CLE_CONTEXT,
+        system.params,
+        targetPartial,
+        user.privateKey
+      );
+      const typeITrace = await decryptCLETeaching(
+        replacementEnvelope,
+        identity,
+        CLE_CONTEXT,
+        system.params,
+        otherPartial,
+        attacker.privateKey
+      );
+      const typeIITrace = await decryptCLETeaching(
+        honest,
+        identity,
+        CLE_CONTEXT,
+        system.params,
+        targetPartial,
+        attacker.privateKey
+      );
+      const tamperedTag = honest.tag.slice();
+      tamperedTag[0] ^= 1;
+      const tampered = await decryptCLE(
+        { c2: honest.c2, tag: tamperedTag },
+        identity,
+        CLE_CONTEXT,
+        system.params,
+        targetPartial,
+        user.privateKey
+      );
+
+      setHTML('term-cle', `
+<span class="lbl-cyan">THREE KEY-OWNERSHIP ROUTES — FRESH RUN</span>
+<span class="lbl-dim">────────────────────────────────────────────────────</span>
+Target = "${escapeHtml(identity)}"
+Message = "${escapeHtml(message)}" (${encodedMessage.length} UTF-8 bytes)
+
+<span class="lbl-cyan">PKI — CA signs identity + user public key</span>
+  CA signature verified before encryption: ${boolVerdict(pkiCiphertext.certificateAccepted, 'YES', 'NO', 'cle-pki-cert')}
+  honest user secret decrypts: ${boolVerdict(pkiHonest, 'YES', 'NO', 'cle-pki-honest')}
+  compromised CA redirects a future send: ${boolVerdict(caRedirectsFuture, 'YES', 'NO', 'cle-pki-future')}
+  same attacker reads recorded honest-key ciphertext: ${boolVerdict(!caReadsRecorded, 'NO', 'YES', 'cle-pki-recorded')}
+
+<span class="lbl-cyan">IBE — identity only; KGC owns full extraction power</span>
+  KGC derives d_ID from master s and decrypts: ${boolVerdict(kgcReadsIbe, 'YES', 'NO', 'cle-ibe-kgc')}
+
+<span class="lbl-cyan">CLE adaptation — target partial + user secret</span>
+  honest holder has both contributions: ${boolVerdict(honestResult.accepted && honestResult.message === message, 'ACCEPT', 'REJECT', 'cle-honest')}
+  Type I (replacement secret, public key guess; no target partial input): ${boolVerdict(!typeI.accepted, 'REJECT', 'ACCEPT', 'cle-type-i')}
+  Type II (target partial, unrelated user secret): ${boolVerdict(!typeII.accepted, 'REJECT', 'ACCEPT', 'cle-type-ii')}
+  combined compromise (target partial + replacement secret): ${boolVerdict(combined.accepted && combined.message === message, 'ACCEPT', 'REJECT', 'cle-combined')}
+  honest user after public-key replacement: ${boolVerdict(!displacedUser.accepted, 'REJECT — availability lost', 'ACCEPT', 'cle-displaced')}
+  one-bit tag mutation: ${boolVerdict(!tampered.accepted, 'REJECT', 'ACCEPT', 'cle-tamper')}
+
+Envelope from this run:
+  c1 serialized before RSA-OAEP = 189 bytes (4 magic + 1 flags + 32 binding + 96 U + 56 V)
+  c2 RSA-OAEP ciphertext = ${honest.c2.length} bytes; fingerprint ${hex(honest.c2, 8)}
+  HMAC-SHA-256 tag = ${honest.tag.length} bytes; fingerprint ${hex(honest.tag, 8)}
+
+<span class="lbl-amber">Observer boundary</span>
+  attacker-visible result for either failed attempt = REJECT only
+  omniscient teaching trace, Type I internal stop = ${escapeHtml(typeITrace.stage)}
+  omniscient teaching trace, Type II internal stop = ${escapeHtml(typeIITrace.stage)}
+  timing is not hardened or claimed constant-time in this browser model
+
+<span class="lbl-amber">Interpretation</span>
+  PKI moves authenticated key binding to the CA. IBE gives the KGC escrow.
+  This CLE envelope makes neither adversary class sufficient alone, but a key
+  replacement can still block delivery, and a directory still needs authentication.
+  These live outcomes demonstrate mechanics; they do not upgrade BasicIdent to CCA security.
+      `.trim());
+    } catch (error) {
+      setHTML('term-cle', `<span class="lbl-red">ERROR: ${escapeHtml(String(error))}</span>`);
     } finally {
       btn.disabled = false;
       btn.setAttribute('aria-disabled', 'false');

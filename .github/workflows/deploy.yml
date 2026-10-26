@@ -29,6 +29,8 @@ jobs:
       - run: npm ci
       - name: Crypto unit tests (Vitest)
         run: npm test
+      - name: Certificateless lesson mutation gate
+        run: npm run test:mutations
       - run: npm run build
       - name: Install Playwright browser
         # The runner's preferred Azure HTTP mirror can stall while Playwright
