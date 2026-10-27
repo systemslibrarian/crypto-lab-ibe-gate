@@ -18,9 +18,10 @@ import {
   encryptHIBE,
   decryptHIBE,
   recoverHIBESecret,
+  senderHIBESecret,
   isIdentityPrefix,
 } from './hibe.ts';
-import { hashToG1, gtToBytes, hashGTtoBytes, pairing, gtEquals } from './pairing.ts';
+import { hashToG1, gtToBytes, hashGTtoBytes, pairing, gtEquals, randomScalar } from './pairing.ts';
 import { demonstrateKeyEscrow } from './scenarios.ts';
 import { byteColor } from './palette.ts';
 import {
@@ -1388,7 +1389,11 @@ function wireExhibit6(): void {
       const target = [root, dept, user];
 
       const message = pad(msg, MSG_BYTES);
-      const ct = await encryptHIBE(message, target, system.params);
+      // The sender keeps its own encapsulation scalar and derives the G_T
+      // element from it here; the ciphertext carries no copy of the secret.
+      const s = randomScalar();
+      const ct = await encryptHIBE(message, target, system.params, s);
+      const senderShared = senderHIBESecret(system.params, s);
       const delegatedPlain = await decryptHIBE(ct, userKey, system.params);
       const delegatedShared = recoverHIBESecret(ct, userKey);
 
@@ -1403,7 +1408,7 @@ function wireExhibit6(): void {
 
       const delegatedOk = unpad(delegatedPlain) === fitted(msg, MSG_BYTES);
       const freshOk = unpad(freshPlain) === fitted(msg, MSG_BYTES);
-      const siblingSecretDiffers = !gtEquals(siblingShared, ct._demoShared);
+      const siblingSecretDiffers = !gtEquals(siblingShared, senderShared);
       const siblingPlainDiffers = Array.from(siblingPlain).some((b, i) => b !== message[i]);
       const subtree = isIdentityPrefix([root, dept], target);
       const siblingIsOutside = !isIdentityPrefix([root, dept], [root, siblingName, user]);
@@ -1435,7 +1440,7 @@ Ciphertext target:
 
 Delegated descendant decrypt:
   recovered = "${shown.delegatedPlain}"
-  sender/recipient G_T secret match: <span class="${gtEquals(delegatedShared, ct._demoShared) ? 'lbl-green' : 'lbl-red'}">${gtEquals(delegatedShared, ct._demoShared) ? 'YES' : 'NO'}</span>
+  sender/recipient G_T secret match: <span class="${gtEquals(delegatedShared, senderShared) ? 'lbl-green' : 'lbl-red'}">${gtEquals(delegatedShared, senderShared) ? 'YES' : 'NO'}</span>
   verdict: <span class="${delegatedOk ? 'lbl-green' : 'lbl-red'}">${delegatedOk ? '✓ DESCENDANT KEY DECRYPTS' : '✗ FAILED'}</span>
 
 Fresh PKG key for the same target:

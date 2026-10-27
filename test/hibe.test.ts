@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { gtEquals } from '../src/pairing.ts';
+import { gtEquals, randomScalar } from '../src/pairing.ts';
 import {
   setupHIBE,
   keyGenHIBE,
@@ -7,6 +7,7 @@ import {
   encryptHIBE,
   decryptHIBE,
   recoverHIBESecret,
+  senderHIBESecret,
   identityComponentScalar,
   isIdentityPrefix,
 } from '../src/hibe.ts';
@@ -26,10 +27,11 @@ describe('asymmetric HIBE delegation core', () => {
     const sys = setupHIBE(3, 32);
     for (const id of [['org'], ['org', 'finance'], ['org', 'finance', 'alice']]) {
       const M = msg32(id.length);
-      const ct = await encryptHIBE(M, id, sys.params);
+      const s = randomScalar();
+      const ct = await encryptHIBE(M, id, sys.params, s);
       const key = keyGenHIBE(id, sys.masterKey, sys.params);
       expect(Array.from(await decryptHIBE(ct, key, sys.params))).toEqual(Array.from(M));
-      expect(gtEquals(recoverHIBESecret(ct, key), ct._demoShared)).toBe(true);
+      expect(gtEquals(recoverHIBESecret(ct, key), senderHIBESecret(sys.params, s))).toBe(true);
     }
   });
 
@@ -38,12 +40,13 @@ describe('asymmetric HIBE delegation core', () => {
     const parent = keyGenHIBE(['org'], sys.masterKey, sys.params);
     const child = delegateHIBE(parent, 'finance', sys.params);
     const M = msg32(33);
-    const ct = await encryptHIBE(M, ['org', 'finance'], sys.params);
+    const s = randomScalar();
+    const ct = await encryptHIBE(M, ['org', 'finance'], sys.params, s);
 
     expect(child.origin).toBe('delegation');
     expect(child.identity).toEqual(['org', 'finance']);
     expect(Array.from(await decryptHIBE(ct, child, sys.params))).toEqual(Array.from(M));
-    expect(gtEquals(recoverHIBESecret(ct, child), ct._demoShared)).toBe(true);
+    expect(gtEquals(recoverHIBESecret(ct, child), senderHIBESecret(sys.params, s))).toBe(true);
   });
 
   it('delegates recursively to a grandchild and preserves the identity prefix', async () => {
@@ -84,11 +87,13 @@ describe('asymmetric HIBE delegation core', () => {
     const finance = delegateHIBE(org, 'finance', sys.params);
     const hr = delegateHIBE(org, 'hr', sys.params);
     const M = msg32(66);
-    const ct = await encryptHIBE(M, ['org', 'finance'], sys.params);
+    const s = randomScalar();
+    const ct = await encryptHIBE(M, ['org', 'finance'], sys.params, s);
 
     expect(finance.identity).not.toEqual(hr.identity);
     const wrongShared = recoverHIBESecret(ct, hr);
-    expect(gtEquals(wrongShared, ct._demoShared)).toBe(false);
+    expect(gtEquals(wrongShared, senderHIBESecret(sys.params, s))).toBe(false);
+    expect(gtEquals(recoverHIBESecret(ct, finance), senderHIBESecret(sys.params, s))).toBe(true);
     expect(Array.from(await decryptHIBE(ct, hr, sys.params))).not.toEqual(Array.from(M));
   });
 
@@ -98,6 +103,22 @@ describe('asymmetric HIBE delegation core', () => {
     expect(isIdentityPrefix(finance, ['org', 'finance', 'payroll', 'alice'])).toBe(true);
     expect(isIdentityPrefix(finance, ['org', 'hr', 'alice'])).toBe(false);
     expect(isIdentityPrefix(finance, ['other-org', 'finance'])).toBe(false);
+  });
+
+  it('carries no sender-side secret in the ciphertext; the sender derives it from its own scalar', async () => {
+    const sys = setupHIBE(2, 32);
+    const s = randomScalar();
+    const ct = await encryptHIBE(msg32(7), ['org', 'finance'], sys.params, s);
+    expect(Object.keys(ct)).not.toContain('_demoShared');
+    expect(Object.keys(ct).sort()).toEqual(
+      ['C1', 'C2', 'C3', 'E', 'V', 'cipherTags', 'identity', 'identityScalars'].sort(),
+    );
+    const key = keyGenHIBE(['org', 'finance'], sys.masterKey, sys.params);
+    expect(gtEquals(recoverHIBESecret(ct, key), senderHIBESecret(sys.params, s))).toBe(true);
+    // A different scalar is a different encapsulation, and the scalar range is enforced.
+    expect(gtEquals(senderHIBESecret(sys.params, s), senderHIBESecret(sys.params, randomScalar()))).toBe(false);
+    expect(() => senderHIBESecret(sys.params, 0n)).toThrow(/\[1, r-1\]/);
+    await expect(encryptHIBE(msg32(7), ['org'], sys.params, 0n)).rejects.toThrow(/\[1, r-1\]/);
   });
 
   it('refuses delegation past the configured maximum depth', () => {

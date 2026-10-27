@@ -80,8 +80,6 @@ export interface HIBECiphertext {
   E: G1Point[];
   cipherTags: bigint[];
   V: Uint8Array;
-  /** Demo-only sender-side encapsulated GT element for correctness checks. */
-  _demoShared: GTElement;
 }
 
 function mod(x: bigint): bigint {
@@ -327,21 +325,34 @@ export function delegateHIBE(
 }
 
 /**
+ * The sender-side encapsulated element e(P1, P2)^(alpha*s) for a chosen
+ * encapsulation scalar. A sender that keeps `s` can derive it here to check a
+ * recipient's recovery; the ciphertext deliberately carries no copy of it.
+ */
+export function senderHIBESecret(params: HIBEPublicParams, s: bigint): GTElement {
+  if (s <= 0n || s >= R) throw new Error('HIBE encapsulation scalar must lie in [1, r-1]');
+  return gtPow(params.eggAlpha, s);
+}
+
+/**
  * Encrypt bytes to an identity vector using the paper's HIBE encapsulation,
- * then hash the encapsulated GT element as a teaching KEM/DEM mask.
+ * then hash the encapsulated GT element as a teaching KEM/DEM mask. The
+ * encapsulation scalar `s` is drawn fresh unless the sender supplies one to
+ * reproduce `senderHIBESecret(params, s)` outside this function.
  */
 export async function encryptHIBE(
   message: Uint8Array,
   identity: readonly string[],
   params: HIBEPublicParams,
+  s: bigint = randomScalar(),
 ): Promise<HIBECiphertext> {
   validateIdentity(identity, params.maxDepth);
   if (message.length !== params.messageBytes) {
     throw new Error(`Message must be exactly ${params.messageBytes} bytes`);
   }
+  if (s <= 0n || s >= R) throw new Error('HIBE encapsulation scalar must lie in [1, r-1]');
 
   const ids = identityScalars(identity);
-  const s = randomScalar();
   const cipherTags = ids.map(() => randomScalar());
 
   const C1 = params.P1.multiply(s) as G1Point;
@@ -359,7 +370,7 @@ export async function encryptHIBE(
     return base.multiply(s) as G1Point;
   });
 
-  const shared = gtPow(params.eggAlpha, s);
+  const shared = senderHIBESecret(params, s);
   const mask = await hashGTtoBytes(shared, params.messageBytes);
 
   return {
@@ -371,7 +382,6 @@ export async function encryptHIBE(
     E,
     cipherTags,
     V: xorBytes(message, mask),
-    _demoShared: shared,
   };
 }
 
