@@ -9,7 +9,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:a11y": "playwright test",
-    "test:mutations": "node scripts/mutations.mjs"
+    "test:mutations": "node scripts/mutations.mjs",
+    "test:mutations:hibe": "node scripts/hibe-mutations.mjs"
   },
   "repository": {
     "type": "git",

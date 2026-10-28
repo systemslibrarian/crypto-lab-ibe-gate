@@ -104,9 +104,11 @@ npm run dev
 ## Run the Tests
 
 ```bash
-npm test            # 50 Vitest tests (IBE, HIBE, CLE/PKI, and palette)
+npm test            # 51 Vitest tests (IBE, HIBE, CLE/PKI, and palette)
 npm run build       # tsc + production bundle (the browser gate runs against this)
 npm run test:a11y   # Playwright: 18 functional + 2 full-state WCAG/reflow drives
+npm run test:mutations        # 10 certificateless mutations, replayed on a clean baseline
+npm run test:mutations:hibe   # 9 HIBE delegation mutations, each killed by a named test
 ```
 
 `npm run test:a11y` runs the whole `e2e/` directory, which is two gates:
@@ -143,7 +145,16 @@ pairing — no mocks — and covers:
 The separate HIBE suite (`test/hibe.test.ts`) checks fresh depth-1/2/3 keys, parent→child and
 recursive delegation without the master secret, fresh/delegated correctness for the same identity,
 structural rejection of a too-shallow parent key, same-depth sibling failure through the actual pairing
-algebra, maximum-depth enforcement, and retained root-PKG escrow.
+algebra, maximum-depth enforcement, retained root-PKG escrow, and that the ciphertext carries no copy
+of the sender's encapsulated secret (the sender derives it from its own scalar with
+`senderHIBESecret`). `scripts/hibe-mutations.mjs` replays nine mutations of `src/hibe.ts` against a
+clean baseline (the recovered secret without the A1 division, a dropped delegation re-randomisation
+sum, a skipped depth check, a C3 missing its τ term, lost level separation, an off-by-one depth limit,
+a child hashed at the parent level, a prefix relation that ignores values, and a sender element for
+s + 1); a recipe counts as caught only when its named owning test is green unmutated, the diff is
+non-empty, the bundle hash moves, that one test fails, and source and bundle restore byte for byte.
+It runs in `deploy.yml` after the certificateless gate and uploads `mutation-evidence.json`.
+Measured on 2026-10-27: 9 of 9 caught.
 
 The certificateless/PKI suite (`test/certificateless.test.ts`) checks the 189-byte canonical inner
 encoding and 256-byte RSA ciphertext, honest two-contribution recovery, fresh envelopes, UTF-8 bounds,

@@ -3,4 +3,6 @@ dist/
 /test-results/
 /playwright-report/
 /.pw-browsers/
+# Written by scripts/hibe-mutations.mjs on every run; CI uploads it as an artifact
+mutation-evidence.json
 chat.md
