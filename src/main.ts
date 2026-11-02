@@ -610,7 +610,7 @@ RIGHT — pair the generators, then exponentiate by a·b:
 master secret s and the sender's random r as the two scalars.</span>
       `.trim());
     } catch (e) {
-      setHTML('term-bilinear', `<span class="lbl-red">ERROR: ${e}</span>`);
+      setHTML('term-bilinear', `<span class="lbl-red">ERROR: ${escapeHtml(String(e))}</span>`);
     }
     disableBtn('btn-bilinear', false);
   });
@@ -659,7 +659,7 @@ Defining hash functions:
         disableBtn(id, false);
       });
     } catch (e) {
-      setHTML('term-setup', `<span class="lbl-red">ERROR: ${e}</span>`);
+      setHTML('term-setup', `<span class="lbl-red">ERROR: ${escapeHtml(String(e))}</span>`);
     }
 
     disableBtn('btn-setup', false);
@@ -784,7 +784,7 @@ g_ID = e(Q_ID, P_pub) ∈ G_T,  then mask = H₂(g_ID^r),  V = M ⊕ mask${trunc
       highlightFlow('encrypt');
       document.getElementById('card-enroll')!.style.display = 'block';
     } catch (e) {
-      setHTML('term-encrypt', `<span class="lbl-red">ERROR: ${e}</span>`);
+      setHTML('term-encrypt', `<span class="lbl-red">ERROR: ${escapeHtml(String(e))}</span>`);
     }
   });
 
@@ -987,8 +987,8 @@ e(d_Eve, U) ∈ G_T — a DIFFERENT pairing → different mask
       animateXor('xor-wk-alice');
       animateXor('xor-wk-eve');
     } catch (e) {
-      setHTML('term-wk-alice', `<span class="lbl-red">ERROR: ${e}</span>`);
-      setHTML('term-wk-eve', `<span class="lbl-red">ERROR: ${e}</span>`);
+      setHTML('term-wk-alice', `<span class="lbl-red">ERROR: ${escapeHtml(String(e))}</span>`);
+      setHTML('term-wk-eve', `<span class="lbl-red">ERROR: ${escapeHtml(String(e))}</span>`);
     }
 
     disableBtn('btn-wrongkey-run', false);
@@ -1172,7 +1172,7 @@ Alice encrypts to "${identity}" — sealed to that exact string:
 ${header}
       `.trimEnd() + '\n' + body.trimStart());
     } catch (e) {
-      setHTML('term-timelimit', `<span class="lbl-red">ERROR: ${e}</span>`);
+      setHTML('term-timelimit', `<span class="lbl-red">ERROR: ${escapeHtml(String(e))}</span>`);
     }
   });
 }
@@ -1464,7 +1464,7 @@ Sibling compromise:
 ${truncNote(msg, MSG_BYTES)}
       `.trim());
     } catch (e) {
-      setHTML('term-hibe', `<span class="lbl-red">ERROR: ${e}</span>`);
+      setHTML('term-hibe', `<span class="lbl-red">ERROR: ${escapeHtml(String(e))}</span>`);
     } finally {
       btn.disabled = false;
       btn.setAttribute('aria-disabled', 'false');
