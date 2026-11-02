@@ -1439,12 +1439,12 @@ Ciphertext target:
   [${shown.target}]
 
 Delegated descendant decrypt:
-  recovered = "${escapeHtml(shown.delegatedPlain)}"
+  recovered = "${shown.delegatedPlain}"
   sender/recipient G_T secret match: <span class="${gtEquals(delegatedShared, senderShared) ? 'lbl-green' : 'lbl-red'}">${gtEquals(delegatedShared, senderShared) ? 'YES' : 'NO'}</span>
   verdict: <span class="${delegatedOk ? 'lbl-green' : 'lbl-red'}">${delegatedOk ? '✓ DESCENDANT KEY DECRYPTS' : '✗ FAILED'}</span>
 
 Fresh PKG key for the same target:
-  recovered = "${escapeHtml(shown.freshPlain)}"
+  recovered = "${shown.freshPlain}"
   verdict: <span class="${freshOk ? 'lbl-green' : 'lbl-red'}">${freshOk ? '✓ PKG ESCROW STILL REACHES THIS BRANCH' : '✗ FAILED'}</span>
 
 Sibling compromise:
