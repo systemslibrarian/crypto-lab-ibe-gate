@@ -1300,7 +1300,7 @@ of what you typed:
           '"'
     }</span>${truncNote(msgStr, MSG_BYTES)}
 
-<span class="lbl-amber">${result.explanation}</span>
+<span class="lbl-amber">${escapeHtml(result.explanation)}</span>
 
 <span class="lbl-dim">This is why IBE requires absolute trust in the PKG.
 The escrow is a design decision — not an accident.</span>
@@ -1417,7 +1417,7 @@ function wireExhibit6(): void {
         dept: escapeHtml(dept),
         user: escapeHtml(user),
         sibling: escapeHtml(siblingName),
-        target: target.map(escapeHtml).join(' / '),
+        target: target.map((part) => escapeHtml(part)).join(' / '),
         delegatedPlain: escapeHtml(unpad(delegatedPlain)),
         freshPlain: escapeHtml(unpad(freshPlain)),
       };
