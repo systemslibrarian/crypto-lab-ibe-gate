@@ -753,10 +753,10 @@ function wireExhibit2() {
       const mask = await hashGTtoBytes(_ct2._demoGtMask, MSG_BYTES);
 
       setHTML('term-encrypt', `
-<span class="lbl-cyan">ALICE ENCRYPTS TO "${identity}"</span>
+<span class="lbl-cyan">ALICE ENCRYPTS TO "${escapeHtml(identity)}"</span>
 <span class="lbl-dim">──────────────────────────────────────────</span>
 
-Compute Q_ID = H₁("${identity}") ∈ G1  (RFC 9380 hash-to-curve):
+Compute Q_ID = H₁("${escapeHtml(identity)}") ∈ G1  (RFC 9380 hash-to-curve):
   ${chip('public', `Q_ID = ${hexG1(Q_ID)}…`)}
   <span class="lbl-dim">^ this point IS Bob's public key — anyone can derive it from his email.</span>
 
@@ -801,7 +801,7 @@ g_ID = e(Q_ID, P_pub) ∈ G_T,  then mask = H₂(g_ID^r),  V = M ⊕ mask${trunc
 <span class="lbl-dim">──────────────────────────────────────</span>
 
 PKG authenticates Bob (out-of-band).
-PKG computes: d_ID = s · H₁("${_ct2.identity}") ∈ G1
+PKG computes: d_ID = s · H₁("${escapeHtml(_ct2.identity)}") ∈ G1
   <span class="lbl-dim">Same Q_ID anyone could compute — but multiplied by the secret s.
   Only the PKG can take this step. That is the whole asymmetry.</span>
 
@@ -857,7 +857,7 @@ M = V ⊕ H₂(e(d_ID, U))
       '\n' +
       `
 Decrypted message:
-<span class="lbl-green">✓ "${msg}"</span>
+<span class="lbl-green">✓ "${escapeHtml(msg)}"</span>
 
 <span class="lbl-cyan">PROOF — the two sides really are the same G_T element:</span>
   Sender computed   e(Q_ID, P_pub)^r = <span class="lbl-magenta">${hexGT(proof.senderGt)}</span>
@@ -949,7 +949,7 @@ function wireExhibit3() {
       const eveMask = await hashGTtoBytes(pairing(eveKey, ct.U), MSG_BYTES);
 
       setHTML('term-wk-alice', `
-${chip('secret', `d_ID = s·H₁("${aliceId}")`)}  ← the key this ciphertext was sealed to
+${chip('secret', `d_ID = s·H₁("${escapeHtml(aliceId)}")`)}  ← the key this ciphertext was sealed to
 e(d_ID, U) ∈ G_T — the correct pairing → correct mask
       `.trim() +
         '\n' +
@@ -965,10 +965,10 @@ e(d_ID, U) ∈ G_T — the correct pairing → correct mask
         }) +
         `\n<span class="lbl-${aliceMsg === fitted(msgStr, MSG_BYTES) ? 'green' : 'red'}">${
           aliceMsg === fitted(msgStr, MSG_BYTES) ? '✓' : '✗'
-        } "${aliceMsg}"</span>${truncNote(msgStr, MSG_BYTES)}`);
+        } "${escapeHtml(aliceMsg)}"</span>${truncNote(msgStr, MSG_BYTES)}`);
 
       setHTML('term-wk-eve', `
-${chip('secret', `d_Eve = s·H₁("${eveId}")`)}  ← Eve's own valid key, wrong identity
+${chip('secret', `d_Eve = s·H₁("${escapeHtml(eveId)}")`)}  ← Eve's own valid key, wrong identity
 e(d_Eve, U) ∈ G_T — a DIFFERENT pairing → different mask
       `.trim() +
         '\n' +
@@ -1107,7 +1107,7 @@ function wireExhibit4() {
         const recovered = unpad(attempt) === msgStr;
         header = `<span class="lbl-gold">PKG POLICY: REFUSE OFF-DATE KEY</span>`;
         body = `
-Bob requests d_ID for "${identity}" — but the PKG's clock says it's not
+Bob requests d_ID for "${escapeHtml(identity)}" — but the PKG's clock says it's not
 the valid date yet, so it declines to extract:
   ${chip('secret', 'd_ID = s · H₁("…") — NOT ISSUED')}
 
@@ -1139,10 +1139,10 @@ ciphertext rather than assert the outcome:
           header = `<span class="lbl-green">PKG POLICY: ISSUE (on-date, authorised)</span>`;
           body = `
 It is the valid date. The PKG authenticates Bob and issues:
-  ${chip('secret', `d_ID = s · H₁("${identity}")`)}
+  ${chip('secret', `d_ID = s · H₁("${escapeHtml(identity)}")`)}
 
 Bob decrypts:
-  <span class="${ok ? 'lbl-green' : 'lbl-red'}">${ok ? `✓ "${recoveredStr}"` : `✗ Decryption failed — recovered "${recoveredStr}"`}</span>${truncNote(msgStr, MSG_BYTES)}
+  <span class="${ok ? 'lbl-green' : 'lbl-red'}">${ok ? `✓ "${escapeHtml(recoveredStr)}"` : `✗ Decryption failed — recovered "${escapeHtml(recoveredStr)}"`}</span>${truncNote(msgStr, MSG_BYTES)}
 
 <span class="lbl-dim">Access happened because the PKG CHOSE to issue — exactly on schedule.</span>`;
         } else {
@@ -1151,10 +1151,10 @@ Bob decrypts:
 A colluding or breached PKG ignores the date policy and issues the key
 early. Nothing in the ciphertext resists this — the identity string is
 the same text either way:
-  ${chip('secret', `d_ID = s · H₁("${identity}")`)}
+  ${chip('secret', `d_ID = s · H₁("${escapeHtml(identity)}")`)}
 
 Bob (or an attacker with PKG help) decrypts BEFORE the embargo:
-  <span class="${ok ? 'lbl-red' : 'lbl-green'}">${ok ? `⚠ "${recoveredStr}" — released early` : `✗ Decryption failed — recovered "${recoveredStr}"`}</span>${truncNote(msgStr, MSG_BYTES)}
+  <span class="${ok ? 'lbl-red' : 'lbl-green'}">${ok ? `⚠ "${escapeHtml(recoveredStr)}" — released early` : `✗ Decryption failed — recovered "${escapeHtml(recoveredStr)}"`}</span>${truncNote(msgStr, MSG_BYTES)}
 
 <span class="lbl-amber">  The "time-lock" was only ever a promise by the key issuer.
   Same escrow power from Exhibit 5, pointed at the clock.</span>`;
@@ -1162,10 +1162,10 @@ Bob (or an attacker with PKG help) decrypts BEFORE the embargo:
       }
 
       setHTML('term-timelimit', `
-<span class="lbl-cyan">IDENTITY STRING: "${identity}"</span>
+<span class="lbl-cyan">IDENTITY STRING: "${escapeHtml(identity)}"</span>
 <span class="lbl-dim">───────────────────────────────────────────────</span>
 
-Alice encrypts to "${identity}" — sealed to that exact string:
+Alice encrypts to "${escapeHtml(identity)}" — sealed to that exact string:
   ${chip('public', `U = ${hexG2(ct.U)}…`)}
   ${chip('public', `V = ${hex(ct.V)}…`)}
 
@@ -1277,9 +1277,9 @@ function wireExhibit5() {
 <span class="lbl-red">PKG EXERCISES MASTER KEY — KEY ESCROW DEMONSTRATION</span>
 <span class="lbl-dim">────────────────────────────────────────────────────</span>
 
-Target identity: "${identity}"
+Target identity: "${escapeHtml(identity)}"
 
-User encrypts message to "${identity}":
+User encrypts message to "${escapeHtml(identity)}":
   Ciphertext looks secure to outside observer.
 
 PKG computes:
@@ -1294,9 +1294,9 @@ Result — this is what the PKG's derived key actually returned, not an echo
 of what you typed:
 <span class="lbl-${result.pkgCanDecrypt ? 'red' : 'green'}">${
       result.pkgCanDecrypt
-        ? '⚠ PKG successfully decrypted: "' + result.decryptedMessage + '"'
+        ? '⚠ PKG successfully decrypted: "' + escapeHtml(result.decryptedMessage) + '"'
         : '✓ PKG could not decrypt (unexpected — this should never happen): "' +
-          result.decryptedMessage +
+          escapeHtml(result.decryptedMessage) +
           '"'
     }</span>${truncNote(msgStr, MSG_BYTES)}
 
@@ -1439,12 +1439,12 @@ Ciphertext target:
   [${shown.target}]
 
 Delegated descendant decrypt:
-  recovered = "${shown.delegatedPlain}"
+  recovered = "${escapeHtml(shown.delegatedPlain)}"
   sender/recipient G_T secret match: <span class="${gtEquals(delegatedShared, senderShared) ? 'lbl-green' : 'lbl-red'}">${gtEquals(delegatedShared, senderShared) ? 'YES' : 'NO'}</span>
   verdict: <span class="${delegatedOk ? 'lbl-green' : 'lbl-red'}">${delegatedOk ? '✓ DESCENDANT KEY DECRYPTS' : '✗ FAILED'}</span>
 
 Fresh PKG key for the same target:
-  recovered = "${shown.freshPlain}"
+  recovered = "${escapeHtml(shown.freshPlain)}"
   verdict: <span class="${freshOk ? 'lbl-green' : 'lbl-red'}">${freshOk ? '✓ PKG ESCROW STILL REACHES THIS BRANCH' : '✗ FAILED'}</span>
 
 Sibling compromise:
