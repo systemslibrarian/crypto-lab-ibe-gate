@@ -499,6 +499,33 @@ test('the PKG decrypts a third party message using only the master secret', asyn
   expect(out).toContain('d_ID = s · Q_ID');
 });
 
+test('an identity containing markup is shown back as text, never parsed', async ({
+  page,
+}) => {
+  await boot(page);
+  await runSetup(page);
+  await page.click('#tab-escrow');
+
+  // CodeQL js/xss-through-dom traced getVal('escrow-identity') into
+  // demonstrateKeyEscrow, which interpolates it into its `explanation`
+  // sentence (src/scenarios.ts), and that sentence was rendered raw. The
+  // identity is echoed in several other places in this panel too.
+  const payload = '<img src=x data-injected=yes>';
+  await page.fill('#escrow-identity', payload);
+  await page.fill('#escrow-message', 'hello');
+  await page.click('#btn-escrow-run');
+
+  const panel = page.locator('#term-escrow');
+  await expect(panel).toContainText('PKG EXERCISES MASTER KEY');
+
+  // Nothing the payload asked for exists as an element.
+  await expect(page.locator('[data-injected]')).toHaveCount(0);
+  // And it is still displayed, verbatim, in both places the identity appears:
+  // the heading and the escrow explanation. Escaping, not filtering.
+  await expect(panel).toContainText(`Target identity: "${payload}"`);
+  await expect(panel).toContainText(`d_ID = s · H₁("${payload}")`);
+});
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Protocol map — the README promises the diagram tracks the running step
 // ─────────────────────────────────────────────────────────────────────────────
