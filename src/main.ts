@@ -1,4 +1,5 @@
 import './style.css';
+import { escapeHtml } from './escape.ts';
 import { bls12_381 as bls } from '@noble/curves/bls12-381.js';
 import {
   setup as ibeSetup,
@@ -112,14 +113,7 @@ function setHTML(id: string, html: string) {
   if (el) el.innerHTML = html;
 }
 
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;');
-}
+
 
 function getVal(id: string): string {
   const el = document.getElementById(id) as HTMLInputElement | null;
