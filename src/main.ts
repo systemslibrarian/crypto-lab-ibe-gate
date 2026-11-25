@@ -102,8 +102,15 @@ function fitted(msg: string, n: number): string {
 
 /** Visible note when the message space truncated the user's input. */
 function truncNote(msg: string, n: number): string {
-  const kept = fitted(msg, n);
-  if (kept === msg) return '';
+  const bytes = new TextEncoder().encode(msg);
+  if (bytes.length <= n) return '';
+  const kept = new TextDecoder('utf-8', { ignoreBOM: true }).decode(bytes.subarray(0, n));
+  // A continuation byte at the first discarded position means the field split a character.
+  if ((bytes[n] & 0xc0) === 0x80) {
+    return `\n<span class="lbl-amber">Only the first ${n} UTF-8 bytes were encrypted.
+    The limit splits a character. The replacement character in the text preview
+    represents incomplete UTF-8. The byte grid shows the actual bytes.</span>`;
+  }
   return `\n<span class="lbl-amber">  Note: BasicIdent's message space here is exactly ${n} bytes, so only
   "${escapeHtml(kept)}" was encrypted — the rest of your input was cut before encryption.</span>`;
 }
@@ -610,6 +617,8 @@ master secret s and the sender's random r as the two scalars.</span>
   });
 
   document.getElementById('btn-setup')!.addEventListener('click', async () => {
+    resetExchange('Run Setup first (Exhibit 1).');
+    disableBtn('btn-encrypt', true);
     loading('term-setup');
     disableBtn('btn-setup', true);
     await new Promise((r) => setTimeout(r, 50));
@@ -645,6 +654,7 @@ Defining hash functions:
 <span class="lbl-gold">  PKG holds s secretly. Master key: NEVER leaves the PKG.</span>
       `.trim());
 
+      resetExchange('Ready to encrypt with the new public parameters.');
       highlightFlow('setup');
       document.getElementById('card-setup-math')!.style.display = 'block';
 
@@ -654,6 +664,10 @@ Defining hash functions:
       });
     } catch (e) {
       setHTML('term-setup', `<span class="lbl-red">ERROR: ${escapeHtml(String(e))}</span>`);
+      if (_system) {
+        resetExchange('Setup failed. You can encrypt again with the previous public parameters.');
+        disableBtn('btn-encrypt', false);
+      }
     }
 
     disableBtn('btn-setup', false);
@@ -685,7 +699,9 @@ function exhibit2(): string {
       <h2>Exhibit 2 — Encrypt Before Recipient Exists</h2>
       <p style="color:var(--text-dim);margin-bottom:14px;font-size:13px;">
         Alice encrypts a message to Bob's email — before Bob has enrolled with the PKG.
-        Bob can decrypt once the PKG issues his private key.
+        Bob can decrypt once the PKG issues his private key. Each new encryption starts
+        the walkthrough again. A key already issued for the same identity still works
+        under the same public parameters.
       </p>
       <div class="field-row">
         <label for="enc-identity">Recipient Identity (any string — email, role, phone…)</label>
@@ -711,8 +727,24 @@ function exhibit2(): string {
   </div>`;
 }
 
-let _ct2: IBECiphertext | null = null;
-let _bobKey2: InstanceType<typeof bls.G1.Point> | null = null;
+interface Exchange {
+  ciphertext: IBECiphertext;
+  plaintext: Uint8Array;
+  recipientKey: InstanceType<typeof bls.G1.Point> | null;
+}
+
+let exchange: Exchange | null = null;
+let exchangeRevision = 0;
+
+function resetExchange(prompt: string): void {
+  exchangeRevision++;
+  exchange = null;
+  setHTML('term-encrypt', prompt);
+  setHTML('term-enroll', 'Waiting…');
+  setHTML('term-decrypt2', 'Waiting…');
+  document.getElementById('card-enroll')!.style.display = 'none';
+  document.getElementById('card-decrypt2')!.style.display = 'none';
+}
 
 function wireExhibit2() {
   // Keep the PKI-vs-IBE contrast box honest: echo whatever recipient the user
@@ -729,22 +761,33 @@ function wireExhibit2() {
     encId.addEventListener('input', syncContrast);
   }
 
+  const messageInput = document.getElementById('enc-message') as HTMLInputElement;
+  const retireEditedExchange = () => resetExchange(
+    _system ? 'Inputs updated. Encrypt to begin a new walkthrough.' : 'Run Setup first (Exhibit 1).'
+  );
+  encId?.addEventListener('input', retireEditedExchange);
+  messageInput.addEventListener('input', retireEditedExchange);
+
   document.getElementById('btn-encrypt')!.addEventListener('click', async () => {
     const sys = getSystem();
     const identity = getVal('enc-identity');
-    const msg = getVal('enc-message');
+    const msg = messageInput.value;
+    resetExchange('');
+    const revision = exchangeRevision;
     loading('term-encrypt');
 
     await new Promise((r) => setTimeout(r, 50));
     try {
       const padded = pad(msg, MSG_BYTES);
-      _ct2 = await encrypt(padded, identity, sys.params);
+      const ciphertext = await encrypt(padded, identity, sys.params);
       const Q_ID = hashToG1(identity);
 
       // Recompute the SAME mask the encryption used, from the retained real
       // GT element g_ID^r. This is not a second encryption — it is exactly
       // H₂(g_ID^r), so padded ⊕ mask === V holds by construction.
-      const mask = await hashGTtoBytes(_ct2._demoGtMask, MSG_BYTES);
+      const mask = await hashGTtoBytes(ciphertext._demoGtMask, MSG_BYTES);
+      if (revision !== exchangeRevision) return;
+      exchange = { ciphertext, plaintext: padded, recipientKey: null };
 
       setHTML('term-encrypt', `
 <span class="lbl-cyan">ALICE ENCRYPTS TO "${escapeHtml(identity)}"</span>
@@ -758,14 +801,14 @@ Pick random r ← [1, r-1]:
   r = <span class="censor" aria-hidden="true">████████████████</span> (discarded after encryption)
 
 U = r · P ∈ G2  (96 bytes) — travels to Bob as part of the ciphertext:
-  ${chip('public', `U = ${hexG2(_ct2.U)}…`)}
+  ${chip('public', `U = ${hexG2(ciphertext.U)}…`)}
 
 g_ID = e(Q_ID, P_pub) ∈ G_T,  then mask = H₂(g_ID^r),  V = M ⊕ mask${truncNote(msg, MSG_BYTES)}
       `.trim() +
         '\n' +
-        xorViz(padded, mask, _ct2.V, {
+        xorViz(padded, mask, ciphertext.V, {
           topLabel: 'M (plaintext)',
-          topSub: '32 bytes of your message',
+          topSub: '32-byte plaintext field (zero-padded)',
           maskLabel: 'H₂(g_ID^r)',
           maskSub: 'mask from the pairing',
           resultLabel: 'V (ciphertext)',
@@ -778,29 +821,33 @@ g_ID = e(Q_ID, P_pub) ∈ G_T,  then mask = H₂(g_ID^r),  V = M ⊕ mask${trunc
       highlightFlow('encrypt');
       document.getElementById('card-enroll')!.style.display = 'block';
     } catch (e) {
+      if (revision !== exchangeRevision) return;
       setHTML('term-encrypt', `<span class="lbl-red">ERROR: ${escapeHtml(String(e))}</span>`);
     }
   });
 
   document.getElementById('btn-enroll')!.addEventListener('click', async () => {
-    if (!_ct2) return;
+    const current = exchange;
+    if (!current) return;
     const sys = getSystem();
     loading('term-enroll');
     await new Promise((r) => setTimeout(r, 50));
 
-    _bobKey2 = extract(_ct2.identity, sys.masterKey);
+    if (current !== exchange) return;
+    const recipientKey = extract(current.ciphertext.identity, sys.masterKey);
+    current.recipientKey = recipientKey;
     highlightFlow('extract');
     setHTML('term-enroll', `
 <span class="lbl-gold">BOB ENROLLS WITH PKG</span>
 <span class="lbl-dim">──────────────────────────────────────</span>
 
 PKG authenticates Bob (out-of-band).
-PKG computes: d_ID = s · H₁("${escapeHtml(_ct2.identity)}") ∈ G1
+PKG computes: d_ID = s · H₁("${escapeHtml(current.ciphertext.identity)}") ∈ G1
   <span class="lbl-dim">Same Q_ID anyone could compute — but multiplied by the secret s.
   Only the PKG can take this step. That is the whole asymmetry.</span>
 
 Bob's private key:
-  ${chip('secret', `d_ID = ${hexG1(_bobKey2)}…`)}
+  ${chip('secret', `d_ID = ${hexG1(recipientKey)}…`)}
 
 <span class="lbl-green">✓ Private key delivered to Bob securely.</span>
 <span class="lbl-dim">  Note: PKG authentication is NOT cryptographic here —</span>
@@ -811,21 +858,29 @@ Bob's private key:
   });
 
   document.getElementById('btn-decrypt2')!.addEventListener('click', async () => {
-    if (!_ct2 || !_bobKey2) return;
+    const current = exchange;
+    if (!current?.recipientKey) return;
+    const { ciphertext, recipientKey, plaintext } = current;
     const sys = getSystem();
     loading('term-decrypt2');
     await new Promise((r) => setTimeout(r, 50));
 
-    const decrypted = await decrypt(_ct2, _bobKey2, sys.params);
+    if (current !== exchange) return;
+    const decrypted = await decrypt(ciphertext, recipientKey, sys.params);
     const msg = unpad(decrypted);
 
     // Prove correctness for THIS ciphertext: recompute the recipient-side
     // pairing and compare it byte-for-byte to the sender's g_ID^r.
-    const proof = verifyPairingIdentity(_ct2, _bobKey2);
+    const proof = verifyPairingIdentity(ciphertext, recipientKey);
 
     // Bob's mask = H₂(e(d_ID,U)). Since the pairing identity holds, this is the
     // SAME 32 bytes Alice used, so V ⊕ maskBob === M. Honest recomputation.
     const maskBob = await hashGTtoBytes(proof.recipientGt, MSG_BYTES);
+    if (current !== exchange) return;
+    if (!proof.equal || decrypted.length !== plaintext.length || !plaintext.every((b, i) => b === decrypted[i])) {
+      setHTML('term-decrypt2', '<span class="lbl-red">The local round-trip check failed. Recovered plaintext could not be confirmed.</span>');
+      return;
+    }
     const senderBytes = gtToBytes(proof.senderGt);
     const recipientBytes = gtToBytes(proof.recipientGt);
 
@@ -838,7 +893,7 @@ Bob computes e(d_ID, U) ∈ G_T, hashes it to the mask, and un-masks V:
 M = V ⊕ H₂(e(d_ID, U))
       `.trim() +
       '\n' +
-      xorViz(_ct2.V, maskBob, decrypted, {
+      xorViz(ciphertext.V, maskBob, decrypted, {
         topLabel: 'V (ciphertext)',
         topSub: 'what Bob received',
         maskLabel: 'H₂(e(d_ID,U))',
@@ -850,17 +905,13 @@ M = V ⊕ H₂(e(d_ID, U))
       }) +
       '\n' +
       `
-Decrypted message:
+Decrypted message (UTF-8 preview; trailing zero bytes omitted):
 <span class="lbl-green">✓ "${escapeHtml(msg)}"</span>
 
 <span class="lbl-cyan">PROOF — the two sides really are the same G_T element:</span>
   Sender computed   e(Q_ID, P_pub)^r = <span class="lbl-magenta">${hexGT(proof.senderGt)}</span>
   Bob computes      e(d_ID, U)       = <span class="lbl-green">${hexGT(proof.recipientGt)}</span>
-<span class="lbl-${proof.equal ? 'green' : 'red'}">  ${
-      proof.equal
-        ? '✓ Fingerprints match — but don\'t take the 16-byte prefix on faith:'
-        : '✗ Mismatch — should never happen.'
-    }</span>
+<span class="lbl-green">  ✓ Fingerprints match — but don't take the 16-byte prefix on faith:</span>
       `.trimEnd() +
       gtInspector(senderBytes, recipientBytes, 'gt-inspect-decrypt') +
       `

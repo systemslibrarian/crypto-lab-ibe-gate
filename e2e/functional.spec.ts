@@ -259,6 +259,72 @@ test('encrypt → enroll → decrypt recovers the message and proves the pairing
   expect(dec).not.toContain('✗ Mismatch');
 });
 
+test('the stranger walkthrough preserves spaces and retires old receipts on edit, re-encryption and setup', async ({ page }) => {
+  await boot(page);
+  await runSetup(page);
+  await page.click('#tab-encrypt');
+  const message = '  Library 📚  ';
+  await page.fill('#enc-message', message);
+  await page.click('#btn-encrypt');
+  await page.click('#btn-enroll');
+  await page.click('#btn-decrypt2');
+  const original = await readXor(page, 'xor-decrypt');
+  expect(bytesToText(original.result)).toBe(message);
+
+  await page.fill('#enc-identity', 'carol@example.test');
+  await expect(page.locator('#xor-encrypt, #xor-decrypt')).toHaveCount(0);
+  await expect(page.locator('#card-enroll')).toBeHidden();
+  await expect(page.locator('#card-decrypt2')).toBeHidden();
+  await page.click('#btn-encrypt');
+  await page.click('#btn-enroll');
+  await expect(page.locator('#term-enroll')).toContainText('carol@example.test');
+
+  // Editing in the same event turn as Decrypt must also cancel its pending output.
+  await page.evaluate(() => {
+    document.getElementById('btn-decrypt2')!.click();
+    const input = document.querySelector<HTMLInputElement>('#enc-message')!;
+    input.value = 'Second note';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await page.click('#btn-encrypt');
+  await page.click('#btn-enroll');
+  await expect(page.locator('#card-decrypt2')).toBeVisible();
+  await expect(page.locator('#term-decrypt2')).toHaveText('Waiting…');
+  await page.click('#btn-decrypt2');
+  expect(bytesToText((await readXor(page, 'xor-decrypt')).result)).toBe('Second note');
+
+  await page.click('#btn-encrypt');
+  await expect(page.locator('#xor-encrypt')).toBeVisible();
+  await expect(page.locator('#card-decrypt2')).toBeHidden();
+  await expect(page.locator('#term-enroll')).toHaveText('Waiting…');
+  await page.click('#tab-setup');
+  await runSetup(page);
+  await page.click('#tab-encrypt');
+  await expect(page.locator('#xor-encrypt, #xor-decrypt')).toHaveCount(0);
+  await expect(page.locator('#card-enroll')).toBeHidden();
+  await expect(page.locator('#card-decrypt2')).toBeHidden();
+  await page.click('#btn-encrypt');
+  await page.click('#btn-enroll');
+  await page.click('#btn-decrypt2');
+  expect(bytesToText((await readXor(page, 'xor-decrypt')).result)).toBe('Second note');
+});
+
+test('a split UTF-8 character is identified in the preview and the exact encrypted prefix round-trips', async ({ page }) => {
+  await boot(page);
+  await runSetup(page);
+  await page.click('#tab-encrypt');
+  const text = 'x'.repeat(31) + '📚';
+  const prefix = Array.from(new TextEncoder().encode(text).slice(0, MSG_BYTES));
+  await page.fill('#enc-message', text);
+  await page.click('#btn-encrypt');
+  await expect(page.locator('#term-encrypt')).toContainText('limit splits a character');
+  expect((await readXor(page, 'xor-encrypt')).top).toEqual(prefix);
+  await page.click('#btn-enroll');
+  await page.click('#btn-decrypt2');
+  expect((await readXor(page, 'xor-decrypt')).result).toEqual(prefix);
+  await expect(page.locator('#term-decrypt2')).toContainText('x'.repeat(31) + '�');
+});
+
 test('the 576-byte G_T inspector counter agrees with the bytes it rendered', async ({
   page,
 }) => {
